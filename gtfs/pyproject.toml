@@ -1,0 +1,45 @@
+[project]
+name = "gtfs-dgraph-importer"
+version = "0.1.0"
+description = "GTFS to Dgraph knowledge graph importer"
+authors = [
+    {name = "GTFS Import Project", email = ""}
+]
+readme = "README_GTFS_Import.md"
+requires-python = ">=3.8"
+dependencies = [
+    "requests>=2.25.1",
+    "pandas>=1.3.0",
+    "python-dotenv>=1.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+]
+
+[project.scripts]
+gtfs-import = "gtfs_import:main"
+gtfs-validate = "test_gtfs_data:main"
+gtfs-query = "sample_queries:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.uv]
+dev-dependencies = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.flake8]
+max-line-length = 88
+extend-ignore = ["E203", "W503"]
