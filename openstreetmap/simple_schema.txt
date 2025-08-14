@@ -1,0 +1,14 @@
+# OpenStreetMap Dgraph Schema
+
+# Node Types
+Feature: uid @id .
+amenity: string @index(exact) .
+name: string @index(fulltext) .
+geometry: uid .
+wkt: string .
+location: string @index(exact) .
+address: string .
+
+# Edges
+Feature.geometry: uid .
+Feature.location: uid .

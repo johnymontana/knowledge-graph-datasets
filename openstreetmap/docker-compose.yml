@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  dgraph:
+    image: dgraph/standalone:latest
+    container_name: osm-dgraph
+    ports:
+      - "8000:8000"  # GraphQL endpoint
+      - "8080:8080"  # HTTP endpoint
+      - "9080:9080"  # gRPC endpoint
+    environment:
+      - DGRAPH_ALPHA_WHITELIST=0.0.0.0/0
+    volumes:
+      - dgraph_data:/dgraph
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  ratel:
+    image: dgraph/dgraph:v23.1.0
+    container_name: osm-ratel
+    ports:
+      - "8001:8001"
+    command: dgraph-ratel
+    depends_on:
+      - dgraph
+    restart: unless-stopped
+
+volumes:
+  dgraph_data:
+    driver: local
