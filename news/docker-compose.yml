@@ -1,0 +1,40 @@
+version: '3.8'
+
+services:
+  dgraph:
+    image: dgraph/standalone:latest
+    container_name: news-dgraph
+    ports:
+      - "8000:8000"  # GraphQL endpoint
+      - "8080:8080"  # HTTP endpoint
+      - "9080:9080"  # gRPC endpoint
+    environment:
+      - DGRAPH_GRAPHQL_EXTENSIONS=true
+      - DGRAPH_GRAPHQL_INTROSPECTION=true
+    volumes:
+      - dgraph_data:/dgraph
+      - ./schema.dql:/schema.dql:ro
+    command: dgraph start --alpha --limit "mutations-nquad=1000000; query-edge=1000000; query-var=1000000" --memory_mb 2048
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  ratel:
+    image: dgraph/ratel:latest
+    container_name: news-ratel
+    ports:
+      - "8001:8000"
+    environment:
+      - DGRAPH_ALPHA=dgraph:9080
+    depends_on:
+      dgraph:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  dgraph_data:
+    driver: local
