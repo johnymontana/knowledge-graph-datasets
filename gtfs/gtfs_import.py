@@ -435,27 +435,31 @@ class GTFSImporter:
             # Clean and convert data types
             cleaned_row = {}
             for key, value in row.items():
-                if value == '':
+                # Skip empty values
+                if value == '' or value is None:
                     continue
                 
                 # Convert numeric fields
                 if key in ['stop_lat', 'stop_lon', 'shape_pt_lat', 'shape_pt_lon', 
-                          'shape_dist_traveled', 'price', 'min_transfer_time']:
+                          'shape_dist_traveled', 'price']:
                     try:
                         cleaned_row[key] = float(value)
                     except (ValueError, TypeError):
                         continue
                 
-                # Convert integer fields
+                # Convert integer fields (including min_transfer_time)
                 elif key in ['route_type', 'location_type', 'wheelchair_boarding', 
                            'direction_id', 'wheelchair_accessible', 'bikes_allowed',
                            'stop_sequence', 'pickup_type', 'drop_off_type', 
                            'continuous_pickup', 'continuous_drop_off', 'timepoint',
                            'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 
                            'saturday', 'sunday', 'exception_type', 'payment_method', 
-                           'transfers', 'transfer_duration', 'transfer_type']:
+                           'transfers', 'transfer_duration', 'transfer_type', 'min_transfer_time']:
                     try:
-                        cleaned_row[key] = int(value)
+                        # Handle float values that should be integers
+                        if isinstance(value, str) and '.' in value:
+                            value = float(value)
+                        cleaned_row[key] = int(float(value))
                     except (ValueError, TypeError):
                         continue
                 

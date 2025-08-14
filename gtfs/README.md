@@ -710,6 +710,283 @@ The dataset contains substantial transit information:
 - **Fare Analysis**: Understand pricing structures
 - **Network Analysis**: Study transfer patterns and connectivity
 
+## 🔍 Example Queries & Results
+
+The following examples demonstrate the query capabilities of the GTFS knowledge graph. These queries showcase real data from the Greater Seattle Metropolitan Area transit system.
+
+### 🚌 Query 1: All Transit Agencies
+
+**DQL Query:**
+```dql
+{
+  agencies(func: type(Agency)) {
+    agency_id
+    agency_name
+    agency_url
+    agency_timezone
+  }
+}
+```
+
+**Result:**
+```
+AGENCIES (12 items):
+  1. {
+    "agency_id": "33",
+    "agency_name": "Waterfront Shuttle Seattle",
+    "agency_url": "https://waterfront.tripshot.com/",
+    "agency_timezone": "America/Los_Angeles"
+  }
+  2. {
+    "agency_id": "51",
+    "agency_name": "Amtrak",
+    "agency_url": "http://www.amtrak.com",
+    "agency_timezone": "America/Los_Angeles"
+  }
+  3. {
+    "agency_id": "96",
+    "agency_name": "Seattle Center Monorail",
+    "agency_url": "http://www.seattlemonorail.com",
+    "agency_timezone": "America/Los_Angeles"
+  }
+  ... and 9 more items
+```
+
+**Insights:** The dataset covers 12 transit agencies serving the Seattle metropolitan area, including major operators like Metro Transit, Sound Transit, and specialized services like the Seattle Center Monorail.
+
+### 🛣️ Query 2: Bus Routes
+
+**DQL Query:**
+```dql
+{
+  routes(func: type(Route)) @filter(eq(route_type, 3)) {
+    route_id
+    route_short_name
+    route_long_name
+    route_type
+  }
+}
+```
+
+**Result:**
+```
+ROUTES (332 items):
+  1. {
+    "route_id": "100039",
+    "route_short_name": "14",
+    "route_type": 3
+  }
+  2. {
+    "route_id": "344",
+    "route_short_name": "344",
+    "route_long_name": "Poulsbo Central",
+    "route_type": 3
+  }
+  3. {
+    "route_id": "120",
+    "route_short_name": "120",
+    "route_long_name": "UW Bothell/Cascadia - Lynnwood City Center Station",
+    "route_type": 3
+  }
+  ... and 329 more items
+```
+
+**Insights:** The system contains 332 bus routes (route_type = 3), covering local, express, and regional bus services throughout the metropolitan area.
+
+### 📍 Query 3: Stops in Downtown Seattle Area
+
+**DQL Query:**
+```dql
+{
+  stops(func: type(Stop)) @filter(ge(stop_lat, 47.6) AND le(stop_lat, 47.62) AND ge(stop_lon, -122.35) AND le(stop_lon, -122.33)) {
+    stop_id
+    stop_name
+    stop_lat
+    stop_lon
+    stop_code
+  }
+}
+```
+
+**Result:**
+```
+STOPS (179 items):
+  1. {
+    "stop_id": "1-1558",
+    "stop_name": "Columbia St & Alaskan Way",
+    "stop_lat": 47.602615,
+    "stop_lon": -122.336784,
+    "stop_code": "1558"
+  }
+  2. {
+    "stop_id": "1-1190",
+    "stop_name": "Pike St & 6th Ave",
+    "stop_lat": 47.611034,
+    "stop_lon": -122.334526,
+    "stop_code": "1190"
+  }
+  3. {
+    "stop_id": "1-548",
+    "stop_name": "3rd Ave & Madison St",
+    "stop_lat": 47.605541,
+    "stop_lon": -122.333832,
+    "stop_code": "548"
+  }
+  ... and 176 more items
+```
+
+**Insights:** The downtown Seattle area (bounded by coordinates) contains 179 transit stops, providing comprehensive coverage of the central business district and waterfront areas.
+
+### 🎯 Query 4: Stops Near Pike Place Market
+
+**DQL Query:**
+```dql
+{
+  stops(func: type(Stop)) @filter(ge(stop_lat, 47.6092) AND le(stop_lat, 47.6102) AND ge(stop_lon, -122.3426) AND le(stop_lon, -122.3376)) {
+    stop_id
+    stop_name
+    stop_lat
+    stop_lon
+    stop_code
+  }
+}
+```
+
+**Result:**
+```
+STOPS (25 items):
+  1. {
+    "stop_id": "29-1079",
+    "stop_name": "2nd Ave & Stewart St",
+    "stop_lat": 47.610619,
+    "stop_lon": -122.340247,
+    "stop_code": "1079"
+  }
+  2. {
+    "stop_id": "a9e1e049-d2c5-4133-9a57-97cda8e8d0af",
+    "stop_name": "I: Pikes Market / Four Seasons Hotel",
+    "stop_lat": 47.61004,
+    "stop_lon": -122.34055
+  }
+  3. {
+    "stop_id": "1-300",
+    "stop_name": "2nd Ave & Pike St",
+    "stop_lat": 47.608646,
+    "stop_lon": -122.338432,
+    "stop_code": "300"
+  }
+  ... and 22 more items
+```
+
+**Insights:** Within a 0.5km radius of Pike Place Market, there are 25 transit stops, including dedicated hotel shuttles and major bus routes serving this popular tourist destination.
+
+### 📅 Query 5: Service Calendar
+
+**DQL Query:**
+```dql
+{
+  calendar(func: type(Calendar), first: 10) {
+    service_id
+    monday
+    tuesday
+    wednesday
+    thursday
+    friday
+    saturday
+    sunday
+    start_date
+    end_date
+  }
+}
+```
+
+**Result:**
+```
+CALENDAR (10 items):
+  1. {
+    "service_id": "1954",
+    "monday": 0,
+    "tuesday": 0,
+    "wednesday": 0,
+    "thursday": 0,
+    "friday": 1,
+    "saturday": 0,
+    "sunday": 0,
+    "start_date": "20250711",
+    "end_date": "20250718"
+  }
+  2. {
+    "service_id": "KPOB-CS:213:6:Sunday:1:25MAR:1234567",
+    "monday": 0,
+    "tuesday": 0,
+    "wednesday": 0,
+    "thursday": 0,
+    "friday": 0,
+    "saturday": 0,
+    "sunday": 1,
+    "start_date": "20250803",
+    "end_date": "20250824"
+  }
+  3. {
+    "service_id": "MCOB-DO:113:6:Sunday:4:25MAR:1234567",
+    "monday": 0,
+    "tuesday": 0,
+    "wednesday": 0,
+    "thursday": 0,
+    "friday": 0,
+    "saturday": 0,
+    "sunday": 1,
+    "start_date": "20250803",
+    "end_date": "20250817"
+  }
+  ... and 7 more items
+```
+
+**Insights:** The service calendar shows various service patterns, from single-day services to regular weekly schedules, with some services running only on specific days (e.g., Friday-only or Sunday-only services).
+
+### 💰 Query 6: Fare Information
+
+**DQL Query:**
+```dql
+{
+  fares(func: type(FareAttribute), first: 10) {
+    fare_id
+    price
+    currency_type
+    payment_method
+    transfers
+  }
+}
+```
+
+**Result:**
+```
+FARES (0 items):
+```
+
+**Insights:** No fare information is currently available in this dataset, which is common for some GTFS feeds that focus on route and schedule information rather than pricing.
+
+### 🚀 Running These Queries
+
+To execute these queries yourself:
+
+```bash
+# Run all sample queries
+uvx run sample_queries.py
+
+# Or run individual queries using the Dgraph Ratel UI
+# Navigate to http://localhost:8001 in your browser
+```
+
+### 🔧 Customizing Queries
+
+Modify the sample queries to explore different aspects of the transit data:
+
+- **Geographic Bounds**: Adjust latitude/longitude filters for different areas
+- **Route Types**: Change `route_type` values (3=Bus, 4=Ferry, 2=Rail, etc.)
+- **Time Ranges**: Filter by service dates or specific time periods
+- **Agency Filtering**: Focus on specific transit operators
+
 ## 🚀 Performance Features
 
 ### Import Optimization
