@@ -96,14 +96,56 @@ uv run python test_gtfs_data.py
 
 ### 5. Import Data
 ```bash
-# Using uvx (recommended)
+# Basic import (will resume if interrupted)
 uvx run gtfs_import.py
 
+# Import with custom batch size
+uvx run gtfs_import.py --batch-size 5000
+
+# Import with custom data directory
+uvx run gtfs_import.py --data-dir /path/to/gtfs/data
+
 # Or using uv with activated virtual environment
-uv run python gtfs_import.py
+uv run python gtfs_import.py --batch-size 5000
 ```
 
-### 6. Explore Data
+**Resume & Progress Management:**
+```bash
+# Check current import progress
+uvx run gtfs_import.py --show-progress
+
+# Reset progress to start fresh
+uvx run gtfs_import.py --reset-progress
+
+# Remove progress file completely
+uvx run gtfs_import.py --clear-progress
+```
+
+### 6. Resume Interrupted Imports
+The import script now includes **automatic resume functionality** that allows you to continue from where you left off if the import is interrupted:
+
+```bash
+# Resume from where you left off (automatic)
+uvx run gtfs_import.py
+
+# Check current import progress
+uvx run gtfs_import.py --show-progress
+
+# Reset progress to start fresh (if needed)
+uvx run gtfs_import.py --reset-progress
+
+# Remove progress file completely
+uvx run gtfs_import.py --clear-progress
+```
+
+**Resume Features:**
+- ✅ **Automatic Progress Tracking**: Saves progress after each batch
+- 🔄 **Smart Resume**: Skips completed entities, resumes from exact batch
+- 📊 **Progress Monitoring**: Real-time status updates
+- 🛡️ **Fault Tolerance**: Handles interruptions gracefully
+- ⚡ **No Duplication**: Never re-imports completed data
+
+### 7. Explore Data
 ```bash
 # Using uvx (recommended)
 uvx run sample_queries.py
@@ -122,6 +164,9 @@ uv run python sample_queries.py
   - Data type validation and conversion
   - Comprehensive error handling
   - Progress logging and reporting
+  - 🔄 Automatic resume functionality for interrupted imports
+  - 📊 Progress tracking with batch-level monitoring
+  - 🛡️ Fault tolerance with graceful error recovery
 
 ### Data Validation (`test_gtfs_data.py`)
 - **Purpose**: Pre-import data analysis
@@ -154,6 +199,224 @@ uv run python sample_queries.py
   - Ratel UI for interactive queries
   - Persistent data storage
   - Health monitoring
+
+## 🔄 Resume & Recovery System
+
+The GTFS import system includes a robust **resume and recovery mechanism** that ensures data integrity and handles interruptions gracefully.
+
+### How It Works
+
+1. **Progress Tracking**: The system automatically tracks import progress for each entity type
+2. **Batch-Level Monitoring**: Progress is saved after each successful batch import
+3. **Smart Resume**: On restart, the system identifies completed work and resumes from the exact point of interruption
+4. **No Data Loss**: All successfully imported data is preserved across interruptions
+
+### Progress File
+
+The system creates a `.import_progress.json` file in your data directory that tracks:
+
+```json
+{
+  "agencies": {
+    "completed": true,
+    "batches_processed": 1,
+    "total_batches": 1
+  },
+  "stops": {
+    "completed": true,
+    "batches_processed": 2,
+    "total_batches": 2
+  },
+  "stop_times": {
+    "completed": false,
+    "batches_processed": 9,
+    "total_batches": 333
+  }
+}
+```
+
+### Resume Scenarios
+
+#### **Interrupted Import**
+```bash
+# Import starts and processes 9/333 batches of stop times
+# User interrupts with Ctrl+C
+# Progress is automatically saved
+
+# Later, resume the import
+uvx run gtfs_import.py
+
+# System automatically:
+# ✅ Skips agencies, routes, stops, calendar, calendar dates, trips
+# 🔄 Resumes stop times from batch 10/333
+# ⏳ Continues with remaining entities
+```
+
+#### **Network Interruption**
+```bash
+# Import fails due to network timeout
+# Progress is saved up to the last successful batch
+
+# When network is restored, resume
+uvx run gtfs_import.py
+
+# System continues from the exact point of failure
+```
+
+#### **System Restart**
+```bash
+# System reboots during import
+# Progress file persists on disk
+
+# After restart, resume import
+uvx run gtfs_import.py
+
+# All previous progress is automatically loaded
+```
+
+### Command Line Options
+
+#### **Show Progress**
+```bash
+# Display current import status
+uvx run gtfs_import.py --show-progress
+
+# Output example:
+# Agencies: ✅ COMPLETED (1/1)
+# Stops: ✅ COMPLETED (2/2)
+# Stop Times: 🔄 IN PROGRESS (9/333)
+# Fare Attributes: ⏳ PENDING
+```
+
+#### **Reset Progress**
+```bash
+# Reset all progress to start fresh
+uvx run gtfs_import.py --reset-progress
+
+# Use when you want to:
+# - Start a completely new import
+# - Re-import all data
+# - Clear any corrupted progress state
+```
+
+#### **Clear Progress File**
+```bash
+# Remove the progress file completely
+uvx run gtfs_import.py --clear-progress
+
+# Use when you want to:
+# - Remove all progress tracking
+# - Start with a clean slate
+# - Troubleshoot progress-related issues
+```
+
+### Progress States
+
+The system tracks three progress states for each entity type:
+
+- **⏳ PENDING**: Entity not yet started
+- **🔄 IN PROGRESS**: Entity partially imported (shows batch progress)
+- **✅ COMPLETED**: Entity fully imported
+
+### Batch Processing with Resume
+
+Each entity type is processed in configurable batches:
+
+```bash
+# Example: Stop times with batch size 10,000
+Processing 333 batches for stop_times (resuming from batch 10)
+Successfully imported batch 10/333
+Successfully imported batch 11/333
+...
+```
+
+**Benefits:**
+- **Memory Efficient**: Processes large datasets in manageable chunks
+- **Fault Tolerant**: Loses only current batch on failure
+- **Progress Visible**: Real-time feedback on import status
+- **Resume Ready**: Can restart from any batch boundary
+
+### Error Recovery
+
+The system handles various error scenarios:
+
+#### **Transaction Errors**
+```bash
+# If a batch fails due to Dgraph issues
+Error in transaction for batch 15/333: <error details>
+# Progress is saved up to batch 14
+# Resume will start from batch 15
+```
+
+#### **Data Validation Errors**
+```bash
+# If data format issues are encountered
+# System logs errors and continues with next batch
+# Failed records are logged for review
+```
+
+#### **Connection Issues**
+```bash
+# If Dgraph connection is lost
+# Progress is saved before attempting connection
+# Resume continues from last successful batch
+```
+
+### Best Practices
+
+#### **For Large Datasets**
+```bash
+# Use appropriate batch sizes
+uvx run gtfs_import.py --batch-size 5000
+
+# Monitor progress regularly
+uvx run gtfs_import.py --show-progress
+
+# Resume after interruptions
+uvx run gtfs_import.py
+```
+
+#### **For Production Environments**
+```bash
+# Set up monitoring for progress file
+# Use log rotation for import logs
+# Implement automated resume on system restart
+```
+
+#### **For Development**
+```bash
+# Test resume functionality with small datasets
+# Use --reset-progress to start fresh
+# Monitor progress file for debugging
+```
+
+### Troubleshooting
+
+#### **Progress File Issues**
+```bash
+# If progress file becomes corrupted
+uvx run gtfs_import.py --clear-progress
+
+# If you want to force re-import
+uvx run gtfs_import.py --reset-progress
+```
+
+#### **Import Stuck**
+```bash
+# Check current progress
+uvx run gtfs_import.py --show-progress
+
+# Verify Dgraph connection
+# Check system resources
+# Resume import
+```
+
+#### **Partial Import Recovery**
+```bash
+# The system automatically handles partial imports
+# No manual intervention needed
+# Simply restart the import process
+```
 
 ## 📦 Package Management
 
@@ -454,6 +717,9 @@ The dataset contains substantial transit information:
 - **Data Validation**: Pre-import data cleaning and type conversion
 - **Progress Tracking**: Real-time import status monitoring
 - **Error Recovery**: Graceful handling of data inconsistencies
+- **🔄 Resume Functionality**: Automatic continuation from interruption points
+- **📊 Progress Persistence**: Progress saved to disk for reliability
+- **⚡ Smart Skip**: Automatically skips completed entities on resume
 
 ### Query Performance
 - **Indexed Fields**: Primary keys and common query fields are indexed
@@ -467,6 +733,15 @@ The dataset contains substantial transit information:
 - **Dgraph Connection**: Connect to local or remote Dgraph instances
 - **Data Directory**: Specify custom GTFS data location
 - **Logging Level**: Control verbosity of import process
+
+### Resume & Progress Management
+- **Progress Tracking**: Automatic progress saving after each batch
+- **Resume Points**: Intelligent resumption from interruption points
+- **Progress File**: `.import_progress.json` tracks all import states
+- **Command Options**: 
+  - `--show-progress`: Display current import status
+  - `--reset-progress`: Reset all progress to start fresh
+  - `--clear-progress`: Remove progress file completely
 
 ### Dgraph Settings
 - **Ports**: Configurable endpoints for HTTP, GraphQL, and gRPC
