@@ -5,7 +5,7 @@ description = "GTFS to Dgraph knowledge graph importer"
 authors = [
     {name = "GTFS Import Project", email = ""}
 ]
-readme = "README_GTFS_Import.md"
+readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
     "requests>=2.25.1",

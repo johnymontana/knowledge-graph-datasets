@@ -1,0 +1,14 @@
+# Simple GTFS Schema for testing
+
+type Agency {
+    agency_id: string @id
+    agency_name: string
+    agency_url: string
+}
+
+type Stop {
+    stop_id: string @id
+    stop_name: string
+    stop_lat: float
+    stop_lon: float
+}

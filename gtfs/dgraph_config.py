@@ -46,18 +46,25 @@ class DgraphConfig:
             print(f"⚠️  No DGRAPH_CONNECTION_STRING found, using default: {self.connection_string}")
     
     def _parse_connection_string(self):
-        """Parse Dgraph connection string format: @dgraph://host:port?param=value"""
-        if not self.connection_string.startswith('@dgraph://'):
-            raise ValueError("Invalid Dgraph connection string format. Must start with '@dgraph://'")
-        
-        # Remove the @dgraph:// prefix
-        connection_url = self.connection_string[10:]
+        """Parse Dgraph connection string format: dgraph://host:port?param=value or @dgraph://host:port?param=value"""
+        # Handle both formats: dgraph:// and @dgraph://
+        if self.connection_string.startswith('@dgraph://'):
+            # Remove the @dgraph:// prefix
+            connection_url = self.connection_string[10:]
+        elif self.connection_string.startswith('dgraph://'):
+            # Remove the dgraph:// prefix
+            connection_url = self.connection_string[9:]
+        else:
+            raise ValueError("Invalid Dgraph connection string format. Must start with 'dgraph://' or '@dgraph://'")
         
         # Parse the URL
         parsed = urlparse(f"dgraph://{connection_url}")
         
         self.host = parsed.hostname
         self.port = parsed.port or 443  # Default to 443 for HTTPS
+        
+        # For gRPC, we might need a different port
+        self.grpc_port = parsed.port or 9080  # Default to 9080 for gRPC
         
         # Parse query parameters
         query_params = parse_qs(parsed.query)
@@ -80,7 +87,7 @@ class DgraphConfig:
     
     def get_grpc_url(self) -> str:
         """Get gRPC URL for Dgraph gRPC API"""
-        return f"{self.host}:{self.port}"
+        return f"{self.host}:{self.grpc_port}"
     
     def get_headers(self) -> Dict[str, str]:
         """Get HTTP headers including authentication"""
@@ -110,6 +117,16 @@ class DgraphConfig:
             ssl_config['verify'] = False
         
         return ssl_config
+    
+    def get_grpc_credentials(self):
+        """Get gRPC credentials for pydgraph client"""
+        if not self.use_ssl:
+            return None
+        
+        # For SSL connections, we'll use insecure credentials for now
+        # In production, you might want to use proper SSL certificates
+        import grpc
+        return grpc.ssl_channel_credentials()
     
     def validate_connection(self) -> bool:
         """Validate the connection configuration"""
