@@ -102,6 +102,189 @@ The project imports various types of OSM data:
 - **Spatial Data**: WKT (Well-Known Text) geometry representations
 - **Metadata**: OSM tags, names, and other attributes
 
+## 🗺️ Graph Data Model
+
+The OpenStreetMap data is modeled in Dgraph using a simple but effective schema that captures the essential relationships between geographic features and their spatial properties.
+
+### Schema Overview
+
+```graphql
+type Feature {
+    name: string
+    amenity: string
+    address: string
+    geometry: Geometry
+    osm_id: string
+}
+
+type Geometry {
+    wkt: string
+}
+
+# Predicates with indexes for efficient querying
+name: string @index(term, fulltext) .
+amenity: string @index(exact, term) .
+address: string @index(term, fulltext) .
+osm_id: string @index(exact) .
+wkt: string .
+geometry: [uid] @reverse .
+```
+
+### Data Model Relationships
+
+```
+┌─────────────┐         ┌──────────────┐
+│   Feature   │────────▶│   Geometry   │
+├─────────────┤         ├──────────────┤
+│ name        │         │ wkt          │
+│ amenity     │         └──────────────┘
+│ address     │              │
+│ osm_id      │              │
+└─────────────┘              │
+       │                     │
+       └─────────────────────┘
+           geometry
+```
+
+**Feature Node**: Represents an OSM feature (restaurant, shop, etc.) with:
+- `name`: Display name of the feature
+- `amenity`: Type of amenity (restaurant, cafe, etc.)  
+- `address`: Concatenated address information
+- `osm_id`: Original OpenStreetMap identifier
+- `geometry`: Reference to associated geometry
+
+**Geometry Node**: Contains spatial data with:
+- `wkt`: Well-Known Text representation of the geographic shape
+
+## 🔍 Sample DQL Queries
+
+Here are example DQL (Dgraph Query Language) queries to explore the imported OpenStreetMap data:
+
+### 1. Find All Restaurants
+
+```graphql
+{
+  restaurants(func: eq(amenity, "restaurant")) {
+    name
+    amenity
+    address
+    osm_id
+    geometry {
+      wkt
+    }
+  }
+}
+```
+
+### 2. Search Restaurants by Name
+
+```graphql
+{
+  search_restaurants(func: allofterms(name, "pizza")) {
+    name
+    amenity
+    address
+    osm_id
+  }
+}
+```
+
+### 3. Find Features by Address
+
+```graphql
+{
+  sf_features(func: anyofterms(address, "California Street")) {
+    name
+    amenity
+    address
+    osm_id
+  }
+}
+```
+
+### 4. Get Features with Geometry Data
+
+```graphql
+{
+  features_with_geo(func: has(geometry)) {
+    name
+    amenity
+    geometry {
+      wkt
+    }
+  }
+}
+```
+
+### 5. Count Features by Amenity Type
+
+```graphql
+{
+  amenity_counts(func: has(amenity)) @groupby(amenity) {
+    count(uid)
+  }
+}
+```
+
+### 6. Find Features with Specific OSM IDs
+
+```graphql
+{
+  specific_features(func: anyofterms(osm_id, "node_286132370 way_1084548884")) {
+    name
+    amenity
+    address
+    osm_id
+    geometry {
+      wkt
+    }
+  }
+}
+```
+
+### 7. Full Text Search Across Names and Addresses
+
+```graphql
+{
+  text_search(func: anyoftext(name, "chinese restaurant")) {
+    name
+    amenity
+    address
+  }
+}
+```
+
+### 8. Get Random Sample of Features
+
+```graphql
+{
+  sample_features(func: has(name), first: 10) {
+    name
+    amenity
+    address
+    geometry {
+      wkt
+    }
+  }
+}
+```
+
+### Advanced Spatial Queries
+
+For more advanced spatial operations, you can:
+
+1. **Parse WKT data** in your application to perform spatial calculations
+2. **Extract coordinates** from WKT POINT geometries for distance calculations
+3. **Use external spatial libraries** (PostGIS, Shapely) with exported data
+4. **Implement custom spatial functions** using Dgraph's extensibility
+
+### Query Performance Tips
+
+- Use **indexed predicates** (`name`, `amenity`, `address`, `osm_id`) for efficient filtering
+- Combine **multiple predicates** to narrow down results
+- Use **pagination** (`first`, `offset`) for large result sets
+- **Cache frequently used queries** in your application
+
 ## 🔧 Configuration
 
 ### Environment Variables

@@ -18,6 +18,7 @@ import pandas as pd
 from rdflib import Graph, Namespace, Literal, URIRef
 from rdflib.namespace import RDF, RDFS, XSD, GEO
 import pydgraph
+import grpc
 from dgraph_config import DgraphConfig
 
 # Configure logging
@@ -55,16 +56,21 @@ class OSMImporter:
         try:
             conn_params = self.config.get_connection_params()
             if 'connection_string' in conn_params:
-                # Remote connection
-                self.dgraph_client = pydgraph.DgraphClient(
-                    pydgraph.DgraphClientStub.from_spec(conn_params['connection_string'])
-                )
+                # Use pydgraph.open() with the connection string directly
+                conn_str = conn_params['connection_string']
+                logger.info(f"Setting up Dgraph connection with: {conn_str}")
+                
+                self.dgraph_client = pydgraph.open(conn_str)
+                
+                # Test connection
+                version = self.dgraph_client.check_version()
+                logger.info(f"✅ Connected to Dgraph version: {version}")
             else:
                 # Local connection
                 self.dgraph_client = pydgraph.DgraphClient(
                     pydgraph.DgraphClientStub(conn_params['host'], conn_params['port'])
                 )
-            logger.info("✅ Connected to Dgraph")
+                logger.info("✅ Connected to local Dgraph")
         except Exception as e:
             logger.error(f"❌ Failed to connect to Dgraph: {e}")
             self.dgraph_client = None
@@ -76,7 +82,7 @@ class OSMImporter:
             logger.info(f"🏷️  Tags: {tags}")
             
             # Search for OSM data
-            gdf = ox.geometries_from_place(location, tags=tags)
+            gdf = ox.features_from_place(location, tags=tags)
             
             if gdf.empty:
                 logger.warning("⚠️  No OSM data found for the specified location and tags")
@@ -94,15 +100,16 @@ class OSMImporter:
         logger.info("🔄 Converting OSM data to RDF format...")
         
         for idx, row in gdf.iterrows():
-            # Create URI for the feature
-            feature_uri = URIRef(f"{OSM}feature/{idx}")
+            # Create URI for the feature - properly handle tuple indices
+            feature_id = str(idx).replace("'", "").replace(" ", "").replace("(", "").replace(")", "").replace(",", "_")
+            feature_uri = URIRef(f"{OSM}feature/{feature_id}")
             
             # Add basic type information
             self.graph.add((feature_uri, RDF.type, OSM_ONTOLOGY.Feature))
             
             # Add geometry information
             if hasattr(row, 'geometry') and row.geometry:
-                geom_uri = URIRef(f"{OSM}geometry/{idx}")
+                geom_uri = URIRef(f"{OSM}geometry/{feature_id}")
                 self.graph.add((feature_uri, GEO_ONTOLOGY.geometry, geom_uri))
                 self.graph.add((geom_uri, RDF.type, GEO_ONTOLOGY.Geometry))
                 
@@ -145,18 +152,117 @@ class OSMImporter:
         try:
             logger.info("🚀 Importing RDF data into Dgraph...")
             
-            # Convert RDF to Dgraph format (simplified)
-            # In a real implementation, you would convert RDF to Dgraph mutations
+            # First, set up the schema
+            self._setup_schema()
             
-            # For now, we'll just log the import
-            logger.info(f"📊 Would import {len(self.graph)} RDF triples to Dgraph")
-            logger.info("⚠️  Dgraph import functionality needs to be implemented")
+            # Convert RDF to Dgraph mutations
+            mutations = self._convert_rdf_to_mutations()
             
+            # Batch the mutations and import
+            batch_size = self.config.batch_size
+            total_mutations = len(mutations)
+            logger.info(f"📊 Importing {total_mutations} mutations in batches of {batch_size}")
+            
+            for i in range(0, total_mutations, batch_size):
+                batch = mutations[i:i + batch_size]
+                txn = self.dgraph_client.txn()
+                
+                try:
+                    # Create the mutation with proper JSON encoding
+                    import json
+                    json_data = json.dumps(batch).encode('utf-8')
+                    mutation = pydgraph.Mutation(set_json=json_data)
+                    response = txn.mutate(mutation)
+                    txn.commit()
+                    logger.info(f"✅ Imported batch {i//batch_size + 1}/{(total_mutations-1)//batch_size + 1}")
+                except Exception as e:
+                    logger.error(f"❌ Error in batch {i//batch_size + 1}: {e}")
+                    txn.discard()
+                finally:
+                    txn.discard()
+            
+            logger.info("🎉 Successfully imported all data to Dgraph!")
             return True
             
         except Exception as e:
             logger.error(f"❌ Error importing to Dgraph: {e}")
             return False
+    
+    def _setup_schema(self):
+        """Setup Dgraph schema for OSM data."""
+        schema = '''
+        type Feature {
+            name: string
+            amenity: string
+            address: string
+            geometry: Geometry
+            osm_id: string
+        }
+        
+        type Geometry {
+            wkt: string
+        }
+        
+        name: string @index(term, fulltext) .
+        amenity: string @index(exact, term) .
+        address: string @index(term, fulltext) .
+        osm_id: string @index(exact) .
+        wkt: string .
+        geometry: [uid] @reverse .
+        '''
+        
+        try:
+            op = pydgraph.Operation(schema=schema)
+            self.dgraph_client.alter(op)
+            logger.info("✅ Schema updated successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Schema update warning: {e}")
+    
+    def _convert_rdf_to_mutations(self) -> List[Dict]:
+        """Convert RDF graph to Dgraph mutations."""
+        mutations = []
+        features = {}  # Store feature data by URI
+        geometries = {}  # Store geometry data by URI
+        
+        # Process RDF triples
+        for subject, predicate, obj in self.graph:
+            subject_str = str(subject)
+            predicate_str = str(predicate)
+            
+            if '/feature/' in subject_str:
+                # This is a feature
+                if subject_str not in features:
+                    features[subject_str] = {'dgraph.type': 'Feature'}
+                
+                if predicate_str.endswith('#label'):
+                    features[subject_str]['name'] = str(obj)
+                elif predicate_str.endswith('amenity'):
+                    features[subject_str]['amenity'] = str(obj)
+                elif predicate_str.endswith('address'):
+                    features[subject_str]['address'] = str(obj)
+                elif predicate_str.endswith('geometry'):
+                    # Link to geometry
+                    features[subject_str]['geometry'] = [{'uid': f'_:{str(obj)}'}]
+                
+                # Add OSM ID from the URI
+                if '/feature/' in subject_str:
+                    osm_id = subject_str.split('/feature/')[-1]
+                    features[subject_str]['osm_id'] = osm_id
+            
+            elif '/geometry/' in subject_str:
+                # This is a geometry
+                if subject_str not in geometries:
+                    geometries[subject_str] = {'dgraph.type': 'Geometry', 'uid': f'_:{subject_str}'}
+                
+                if predicate_str.endswith('wkt'):
+                    geometries[subject_str]['wkt'] = str(obj)
+        
+        # Convert to mutation format
+        mutations.extend(features.values())
+        mutations.extend(geometries.values())
+        
+        logger.info(f"🔄 Converted {len(features)} features and {len(geometries)} geometries to mutations")
+        return mutations
     
     def run_import(self) -> bool:
         """Run the complete import process."""
@@ -164,8 +270,16 @@ class OSMImporter:
             # Get OSM configuration
             osm_config = self.config.get_osm_config()
             
+            # Parse tags properly
+            tags = {}
+            if '=' in osm_config['tags']:
+                key, value = osm_config['tags'].split('=', 1)
+                tags[key] = value
+            else:
+                tags['amenity'] = osm_config['tags']
+            
             # Search for OSM data
-            gdf = self.search_osm_data(osm_config['location'], {'amenity': osm_config['tags']})
+            gdf = self.search_osm_data(osm_config['location'], tags)
             
             if gdf.empty:
                 logger.error("❌ No data to import")
