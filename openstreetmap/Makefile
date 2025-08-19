@@ -40,6 +40,9 @@ lint: ## Lint code with flake8
 run-import: ## Run OSM import script
 	uvx run osm_import.py
 
+run-full-import: ## Run full OSM import script
+	uv run osm_import_enhanced.py
+
 run-validate: ## Run OSM data validation
 	uvx run test_osm_data.py
 
