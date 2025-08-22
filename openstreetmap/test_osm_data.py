@@ -14,7 +14,7 @@ from typing import Dict, Any
 import osmnx as ox
 import geopandas as gpd
 import pandas as pd
-from dgraph_config import DgraphConfig
+from neo4j_config import Neo4jConfig
 
 # Configure logging
 logging.basicConfig(
@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 class OSMDataValidator:
     """Class for validating OSM data and testing import functionality."""
     
-    def __init__(self, config: DgraphConfig):
+    def __init__(self, config: Neo4jConfig):
         self.config = config
     
     def test_osm_connection(self) -> bool:
@@ -182,7 +182,7 @@ def main():
         logging.getLogger().setLevel(logging.DEBUG)
     
     # Load configuration
-    config = DgraphConfig()
+    config = Neo4jConfig()
     
     # Override config with command line arguments
     if args.location:

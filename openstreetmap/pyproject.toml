@@ -1,7 +1,7 @@
 [project]
-name = "osm-dgraph-importer"
+name = "osm-neo4j-importer"
 version = "0.1.0"
-description = "OpenStreetMap to Dgraph knowledge graph importer using OSMnx"
+description = "OpenStreetMap to Neo4j knowledge graph importer using OSMnx"
 authors = [
     {name = "OSM Import Project", email = ""}
 ]
@@ -10,12 +10,11 @@ requires-python = ">=3.8"
 dependencies = [
     "osmnx>=1.3.0",
     "geopandas>=0.12.2",
-    "rdflib>=6.3.2",
     "shapely>=2.0.1",
     "networkx>=3.1",
     "matplotlib>=3.7.1",
     "python-dotenv>=1.0.0",
-    "pydgraph>=23.0.0",
+    "neo4j>=5.15.0",
     "requests>=2.25.1",
     "pandas>=1.3.0",
 ]

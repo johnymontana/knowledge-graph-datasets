@@ -1,10 +1,10 @@
-# OpenStreetMap to Dgraph Knowledge Graph Project
+# OpenStreetMap to Neo4j Knowledge Graph Project
 
-This project provides a complete solution for importing OpenStreetMap (OSM) data into Dgraph, creating a rich knowledge graph of geographic and amenity information that can be queried and analyzed spatially.
+This project provides a complete solution for importing OpenStreetMap (OSM) data into Neo4j, creating a rich knowledge graph of geographic and amenity information that can be queried and analyzed spatially.
 
 ## 🎯 Project Goals
 
-- **Geospatial Data Integration**: Import comprehensive OSM data into Dgraph using OSMnx
+- **Geospatial Data Integration**: Import comprehensive OSM data into Neo4j using OSMnx
 - **Knowledge Graph**: Create meaningful relationships between geographic features and amenities
 - **Spatial Query Capability**: Enable complex spatial and attribute-based queries
 - **Road Network Analysis**: Import complete road networks with intersections for routing
@@ -15,7 +15,7 @@ This project provides a complete solution for importing OpenStreetMap (OSM) data
 ## 🏗️ Architecture Overview
 
 ```
-OpenStreetMap Data → OSMnx Python Package → Enhanced RDF Conversion → Dgraph Database
+OpenStreetMap Data → OSMnx Python Package → Enhanced Cypher Conversion → Neo4j Database
                                     ↓
                             Road Networks + Intersections + Amenities
                                     ↓
@@ -56,54 +56,49 @@ The enhanced importer now:
 
 ## 📊 Enhanced Schema
 
-```dql
-type Feature {
-    name: string
-    amenity: string
-    address: string
-    geometry: Geometry
-    osm_id: string
-    highway: string
-    oneway: bool
-    lanes: int
-    maxspeed: int
-    surface: string
+```cypher
+// Node Labels and Properties
+(:Feature {
+    name: string,
+    amenity: string,
+    address: string,
+    osm_id: string,
+    highway: string,
+    oneway: boolean,
+    lanes: integer,
+    maxspeed: integer,
+    surface: string,
     ref: string
-}
+})
 
-type Geometry {
+(:Geometry {
+    geom_id: string,
     wkt: string
-}
+})
 
-type Intersection {
-    osm_id: string
-    name: string
-    geometry: Geometry
-    latitude: float
+(:Intersection {
+    osm_id: string,
+    name: string,
+    latitude: float,
     longitude: float
-}
+})
 
-type Road {
-    osm_id: string
-    name: string
-    highway: string
-    oneway: bool
-    lanes: int
-    maxspeed: int
-    surface: string
-    ref: string
+(:Road {
+    osm_id: string,
+    name: string,
+    highway: string,
+    oneway: boolean,
+    lanes: integer,
+    maxspeed: integer,
+    surface: string,
+    ref: string,
     length: float
-    geometry: Geometry
-    from_intersection: Intersection
-    to_intersection: Intersection
-}
+})
 
-type Route {
-    start_point: Intersection
-    end_point: Intersection
-    total_distance: float
-    total_time: float
-}
+// Relationships
+(:Feature|:Intersection|:Road)-[:HAS_GEOMETRY]->(:Geometry)
+(:Road)-[:FROM_INTERSECTION]->(:Intersection)
+(:Road)-[:TO_INTERSECTION]->(:Intersection)
 ```
 
 ## 🔍 Enhanced Query Examples
@@ -111,134 +106,102 @@ type Route {
 ### **1. Road Network Analysis**
 
 #### Find all major highways:
-```dql
-{
-  highways(func: eq(highway, "primary")) {
-    name
-    highway
-    length
-    from_intersection {
-      latitude
-      longitude
-    }
-    to_intersection {
-      latitude
-      longitude
-    }
-  }
-}
+```cypher
+MATCH (r:Road)-[:FROM_INTERSECTION]->(from_i:Intersection),
+      (r)-[:TO_INTERSECTION]->(to_i:Intersection)
+WHERE r.highway = 'primary'
+RETURN r.name, r.highway, r.length, 
+       from_i.latitude, from_i.longitude,
+       to_i.latitude, to_i.longitude
+LIMIT 100
 ```
 
 #### Find intersections with high connectivity:
-```dql
-{
-  busy_intersections(func: has(geometry), first: 10) @filter(gt(count(~from_intersection), 5)) {
-    osm_id
-    latitude
-    longitude
-    ~from_intersection {
-      name
-      highway
-      length
-    }
-  }
-}
+```cypher
+MATCH (i:Intersection)<-[:FROM_INTERSECTION]-(r:Road)
+WITH i, count(r) as road_count
+WHERE road_count > 5
+RETURN i.osm_id, i.latitude, i.longitude, road_count
+ORDER BY road_count DESC
+LIMIT 10
 ```
 
 ### **2. Spatial Routing Queries**
 
 #### Find roads within a specific area:
-```dql
-{
-  downtown_roads(func: has(geometry)) @filter(geoWithin(geometry, "POLYGON((-122.4 37.78, -122.4 37.79, -122.39 37.79, -122.39 37.78, -122.4 37.78))")) {
-    name
-    highway
-    length
-    from_intersection {
-      latitude
-      longitude
-    }
-    to_intersection {
-      latitude
-      longitude
-    }
-  }
-}
+```cypher
+MATCH (r:Road)-[:FROM_INTERSECTION]->(from_i:Intersection),
+      (r)-[:TO_INTERSECTION]->(to_i:Intersection)
+WHERE from_i.latitude >= 37.78 AND from_i.latitude <= 37.79
+  AND from_i.longitude >= -122.4 AND from_i.longitude <= -122.39
+RETURN r.name, r.highway, r.length,
+       from_i.latitude, from_i.longitude,
+       to_i.latitude, to_i.longitude
+LIMIT 100
 ```
 
 #### Find nearest intersection to coordinates:
-```dql
-{
-  nearest_intersection(func: has(latitude)) @filter(geoNear(geometry, "POINT(-122.4194 37.7749)", 1000)) {
-    osm_id
-    name
-    latitude
-    longitude
-  }
-}
+```cypher
+MATCH (i:Intersection)
+WITH i, point.distance(
+  point({latitude: i.latitude, longitude: i.longitude}),
+  point({latitude: 37.7749, longitude: -122.4194})
+) AS distance
+WHERE distance < 1000
+RETURN i.osm_id, i.name, i.latitude, i.longitude, distance
+ORDER BY distance
+LIMIT 10
 ```
 
 ### **3. Pathfinding & Navigation**
 
-#### Find route between two points:
-```dql
-{
-  route(func: has(from_intersection)) @filter(eq(from_intersection.latitude, 37.7749) AND eq(from_intersection.longitude, -122.4194)) {
-    name
-    length
-    travel_time: length
-    to_intersection {
-      latitude
-      longitude
-    }
-  }
-}
+#### Find shortest path between two intersections:
+```cypher
+MATCH (start:Intersection {osm_id: "123456"}),
+      (end:Intersection {osm_id: "789012"})
+CALL apoc.algo.dijkstra(start, end, 'FROM_INTERSECTION|TO_INTERSECTION', 'length')
+YIELD path, weight
+RETURN path, weight
 ```
 
 #### Analyze road network connectivity:
-```dql
-{
-  network_stats(func: has(highway)) @groupby(highway) {
-    count(uid)
-    avg(length)
-    sum(length)
-  }
-}
+```cypher
+MATCH (r:Road)
+RETURN r.highway as road_type,
+       count(r) as road_count,
+       avg(r.length) as avg_length,
+       sum(r.length) as total_length
+ORDER BY road_count DESC
 ```
 
 ### **4. Enhanced Amenity Queries**
 
-#### Find restaurants near specific intersections:
-```dql
-{
-  nearby_restaurants(func: eq(amenity, "restaurant")) @filter(geoNear(geometry, "POINT(-122.4194 37.7749)", 500)) {
-    name
-    amenity
-    address
-    geometry {
-      wkt
-    }
-  }
-}
+#### Find restaurants near specific coordinates:
+```cypher
+MATCH (f:Feature)-[:HAS_GEOMETRY]->(g:Geometry)
+WHERE f.amenity = 'restaurant'
+  AND g.wkt IS NOT NULL
+WITH f, g,
+     point.distance(
+       point({latitude: 37.7749, longitude: -122.4194}),
+       point({latitude: toFloat(split(replace(g.wkt, 'POINT(', ''), ')')[1]), 
+              longitude: toFloat(split(replace(g.wkt, 'POINT(', ''), ')')[0])})
+     ) as distance
+WHERE distance < 500
+RETURN f.name, f.amenity, f.address, g.wkt, distance
+ORDER BY distance
+LIMIT 20
 ```
 
-#### Find amenities along specific road types:
-```dql
-{
-  road_amenities(func: has(highway)) @filter(eq(highway, "primary")) {
-    highway
-    name
-    length
-    ~from_intersection {
-      ~geometry {
-        ~geometry {
-          name
-          amenity
-        }
-      }
-    }
-  }
-}
+#### Find amenities along major roads:
+```cypher
+MATCH (r:Road)-[:FROM_INTERSECTION]->(i:Intersection)
+WHERE r.highway = 'primary'
+WITH collect(DISTINCT i) as major_intersections
+MATCH (f:Feature)-[:HAS_GEOMETRY]->(g:Geometry)
+WHERE f.amenity IS NOT NULL
+RETURN f.name, f.amenity, r.name as road_name, r.highway
+LIMIT 50
 ```
 
 ## 🛠️ Enhanced Import Script
@@ -290,7 +253,8 @@ uv run python osm_import_enhanced.py \
 
 ### **Documentation**
 - [OSMnx Documentation](https://osmnx.readthedocs.io/)
-- [Dgraph GraphQL+](https://dgraph.io/docs/graphql/)
+- [Neo4j Cypher Manual](https://neo4j.com/docs/cypher-manual/current/)
+- [Neo4j APOC Procedures](https://neo4j.com/labs/apoc/)
 - [OpenStreetMap Data](https://wiki.openstreetmap.org/wiki/Data)
 
 ### **Example Datasets**
@@ -306,4 +270,38 @@ uv run python osm_import_enhanced.py \
 
 ---
 
-**🎉 The enhanced OpenStreetMap to Dgraph project now provides a complete solution for spatial knowledge graphs with routing capabilities!**
+## 🚀 Getting Started
+
+### **Prerequisites**
+- Python 3.8+
+- Docker and Docker Compose
+- uv (Python package manager)
+
+### **Quick Start**
+
+1. **Start Neo4j**:
+   ```bash
+   ./start_neo4j.sh
+   ```
+
+2. **Install dependencies**:
+   ```bash
+   uv sync
+   ```
+
+3. **Import OSM data**:
+   ```bash
+   uv run python osm_import_enhanced.py --location "San Francisco, California" --tags "amenity=restaurant"
+   ```
+
+4. **Run sample queries**:
+   ```bash
+   uv run python sample_queries.py --all
+   ```
+
+5. **Access Neo4j Browser**:
+   Open http://localhost:7474/browser/ (username: neo4j, password: password)
+
+---
+
+**🎉 The enhanced OpenStreetMap to Neo4j project now provides a complete solution for spatial knowledge graphs with routing capabilities!**

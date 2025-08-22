@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Dgraph Configuration Management for OSM Import
+Neo4j Configuration Management for OSM Import
 
-This module handles configuration loading and Dgraph connection setup
+This module handles configuration loading and Neo4j connection setup
 for the OpenStreetMap data import project.
 """
 
@@ -22,47 +22,43 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
-class DgraphConfig:
-    """Configuration class for Dgraph connection and import settings."""
+class Neo4jConfig:
+    """Configuration class for Neo4j connection and import settings."""
     
     def __init__(self):
-        self.connection_string = os.getenv('DGRAPH_CONNECTION_STRING')
+        self.uri = os.getenv('NEO4J_URI', 'bolt://localhost:7687')
+        self.username = os.getenv('NEO4J_USERNAME', 'neo4j')
+        self.password = os.getenv('NEO4J_PASSWORD', 'password')
+        self.database = os.getenv('NEO4J_DATABASE', 'neo4j')
         self.batch_size = int(os.getenv('BATCH_SIZE', '1000'))
         self.data_dir = os.getenv('DATA_DIR', 'data')
         
         # OSM-specific configuration
         self.osm_location = os.getenv('OSM_LOCATION', 'San Francisco, California')
         self.osm_tags = os.getenv('OSM_TAGS', 'amenity=restaurant')
-        self.osm_output_file = os.getenv('OSM_OUTPUT_FILE', 'osm_data.rdf')
+        self.osm_output_file = os.getenv('OSM_OUTPUT_FILE', 'osm_data.cypher')
         
         # Validate configuration
         self._validate_config()
     
     def _validate_config(self):
         """Validate the configuration settings."""
-        if not self.connection_string:
-            logger.warning("No DGRAPH_CONNECTION_STRING provided. Using localhost:8080")
-            self.connection_string = "@dgraph://localhost:8080"
+        if not self.uri:
+            logger.warning("No NEO4J_URI provided. Using bolt://localhost:7687")
+            self.uri = "bolt://localhost:7687"
         
         if not os.path.exists(self.data_dir):
             logger.info(f"Creating data directory: {self.data_dir}")
             os.makedirs(self.data_dir, exist_ok=True)
     
     def get_connection_params(self) -> dict:
-        """Parse connection string and return connection parameters."""
-        if self.connection_string.startswith('@'):
-            # Local connection
-            host_port = self.connection_string[1:].replace('dgraph://', '')
-            return {
-                'host': host_port.split(':')[0],
-                'port': int(host_port.split(':')[1]) if ':' in host_port else 8080
-            }
-        else:
-            # Remote connection (simplified parsing)
-            logger.info("Remote Dgraph connection detected")
-            return {
-                'connection_string': self.connection_string
-            }
+        """Get Neo4j connection parameters."""
+        return {
+            'uri': self.uri,
+            'username': self.username,
+            'password': self.password,
+            'database': self.database
+        }
     
     def get_osm_config(self) -> dict:
         """Get OSM-specific configuration."""
@@ -74,9 +70,11 @@ class DgraphConfig:
     
     def print_config(self):
         """Print current configuration."""
-        print("🔧 OSM Dgraph Configuration")
+        print("🔧 OSM Neo4j Configuration")
         print("=" * 40)
-        print(f"📊 Dgraph Connection: {self.connection_string}")
+        print(f"📊 Neo4j URI: {self.uri}")
+        print(f"👤 Username: {self.username}")
+        print(f"💽 Database: {self.database}")
         print(f"📦 Batch Size: {self.batch_size}")
         print(f"📁 Data Directory: {self.data_dir}")
         print(f"🗺️  OSM Location: {self.osm_location}")
@@ -87,7 +85,7 @@ class DgraphConfig:
 
 def main():
     """Main function to display configuration."""
-    config = DgraphConfig()
+    config = Neo4jConfig()
     config.print_config()
 
 

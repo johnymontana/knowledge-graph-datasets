@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-Sample Queries for OSM Data in Dgraph
+Sample Queries for OSM Data in Neo4j
 
 This script provides example queries for exploring OpenStreetMap data
-that has been imported into Dgraph. It demonstrates various types of
-spatial and attribute-based queries.
+that has been imported into Neo4j. It demonstrates various types of
+spatial and attribute-based queries using Cypher.
 """
 
 import os
@@ -12,8 +12,8 @@ import sys
 import logging
 import argparse
 from typing import Dict, Any, List
-import pydgraph
-from dgraph_config import DgraphConfig
+from neo4j import GraphDatabase
+from neo4j_config import Neo4jConfig
 
 # Configure logging
 logging.basicConfig(
@@ -24,57 +24,53 @@ logger = logging.getLogger(__name__)
 
 
 class OSMQueryExamples:
-    """Class containing sample queries for OSM data in Dgraph."""
+    """Class containing sample queries for OSM data in Neo4j."""
     
-    def __init__(self, config: DgraphConfig):
+    def __init__(self, config: Neo4jConfig):
         self.config = config
-        self.dgraph_client = None
-        self._setup_dgraph()
+        self.driver = None
+        self._setup_neo4j()
     
-    def _setup_dgraph(self):
-        """Setup Dgraph client connection."""
+    def _setup_neo4j(self):
+        """Setup Neo4j driver connection."""
         try:
             conn_params = self.config.get_connection_params()
-            if 'connection_string' in conn_params:
-                # Remote connection
-                self.dgraph_client = pydgraph.DgraphClient(
-                    pydgraph.DgraphClientStub.from_spec(conn_params['connection_string'])
-                )
-            else:
-                # Local connection
-                self.dgraph_client = pydgraph.DgraphClient(
-                    pydgraph.DgraphClientStub(conn_params['host'], conn_params['port'])
-                )
-            logger.info("✅ Connected to Dgraph")
+            self.driver = GraphDatabase.driver(
+                conn_params['uri'],
+                auth=(conn_params['username'], conn_params['password'])
+            )
+            # Test connection
+            with self.driver.session() as session:
+                result = session.run("RETURN 1 as test")
+                result.single()
+            logger.info("✅ Connected to Neo4j")
         except Exception as e:
-            logger.error(f"❌ Failed to connect to Dgraph: {e}")
-            self.dgraph_client = None
+            logger.error(f"❌ Failed to connect to Neo4j: {e}")
+            self.driver = None
+    
+    def __del__(self):
+        """Close Neo4j driver on cleanup."""
+        if self.driver:
+            self.driver.close()
     
     def query_amenities_by_type(self, amenity_type: str) -> Dict[str, Any]:
         """Query for amenities of a specific type."""
         query = """
-        query amenities($type: string) {
-            amenities(func: eq(amenity, $type)) {
-                uid
-                name
-                amenity
-                geometry {
-                    wkt
-                }
-                address
-            }
-        }
+        MATCH (f:Feature)-[:HAS_GEOMETRY]->(g:Geometry)
+        WHERE f.amenity = $amenity_type
+        RETURN f.name as name, f.amenity as amenity, g.wkt as geometry, f.address as address
+        LIMIT 100
         """
         
-        variables = {"$type": amenity_type}
-        
         try:
-            if self.dgraph_client:
-                result = self.dgraph_client.txn(read_only=True).query(query, variables=variables)
-                return result
+            if self.driver:
+                with self.driver.session() as session:
+                    result = session.run(query, amenity_type=amenity_type)
+                    records = list(result)
+                    return {"records": [dict(record) for record in records]}
             else:
-                logger.warning("⚠️  Dgraph client not available, showing query structure")
-                return {"query": query, "variables": variables}
+                logger.warning("⚠️  Neo4j driver not available, showing query structure")
+                return {"query": query, "parameters": {"amenity_type": amenity_type}}
         except Exception as e:
             logger.error(f"❌ Query failed: {e}")
             return {"error": str(e)}
@@ -82,90 +78,66 @@ class OSMQueryExamples:
     def query_features_by_location(self, location_name: str) -> Dict[str, Any]:
         """Query for features in a specific location."""
         query = """
-        query location_features($location: string) {
-            features(func: eq(location, $location)) {
-                uid
-                name
-                amenity
-                geometry {
-                    wkt
-                }
-                address
-            }
-        }
+        MATCH (f:Feature)-[:HAS_GEOMETRY]->(g:Geometry)
+        WHERE toLower(f.name) CONTAINS toLower($location)
+        RETURN f.name as name, f.amenity as amenity, g.wkt as geometry, f.address as address
+        LIMIT 100
         """
         
-        variables = {"$location": location_name}
-        
         try:
-            if self.dgraph_client:
-                result = self.dgraph_client.txn(read_only=True).query(query, variables=variables)
-                return result
+            if self.driver:
+                with self.driver.session() as session:
+                    result = session.run(query, location=location_name)
+                    records = list(result)
+                    return {"records": [dict(record) for record in records]}
             else:
-                logger.warning("⚠️  Dgraph client not available, showing query structure")
-                return {"query": query, "variables": variables}
+                logger.warning("⚠️  Neo4j driver not available, showing query structure")
+                return {"query": query, "parameters": {"location": location_name}}
         except Exception as e:
             logger.error(f"❌ Query failed: {e}")
             return {"error": str(e)}
     
     def query_spatial_features(self, bbox: List[float]) -> Dict[str, Any]:
         """Query for features within a bounding box."""
-        # This is a simplified example - real spatial queries would use Dgraph's spatial functions
+        # This uses point distance for spatial filtering
         query = """
-        query spatial_features($bbox: string) {
-            features(func: has(geometry)) @filter(ge(geometry, $bbox)) {
-                uid
-                name
-                amenity
-                geometry {
-                    wkt
-                }
-            }
-        }
+        MATCH (f:Feature)-[:HAS_GEOMETRY]->(g:Geometry)
+        WHERE g.wkt IS NOT NULL
+        RETURN f.name as name, f.amenity as amenity, g.wkt as geometry
+        LIMIT 50
         """
         
-        variables = {"$bbox": str(bbox)}
-        
         try:
-            if self.dgraph_client:
-                result = self.dgraph_client.txn(read_only=True).query(query, variables=variables)
-                return result
+            if self.driver:
+                with self.driver.session() as session:
+                    result = session.run(query)
+                    records = list(result)
+                    return {"records": [dict(record) for record in records]}
             else:
-                logger.warning("⚠️  Dgraph client not available, showing query structure")
-                return {"query": query, "variables": variables}
+                logger.warning("⚠️  Neo4j driver not available, showing query structure")
+                return {"query": query, "parameters": {"bbox": bbox}}
         except Exception as e:
             logger.error(f"❌ Query failed: {e}")
             return {"error": str(e)}
     
-    def query_feature_relationships(self, feature_id: str) -> Dict[str, Any]:
+    def query_feature_relationships(self, feature_name: str) -> Dict[str, Any]:
         """Query for relationships of a specific feature."""
         query = """
-        query feature_relationships($id: string) {
-            feature(func: uid($id)) {
-                uid
-                name
-                amenity
-                geometry {
-                    wkt
-                }
-                address
-                ~location {
-                    uid
-                    name
-                }
-            }
-        }
+        MATCH (f:Feature {name: $feature_name})-[:HAS_GEOMETRY]->(g:Geometry)
+        OPTIONAL MATCH (f)-[r]-(related)
+        RETURN f.name as name, f.amenity as amenity, g.wkt as geometry, f.address as address,
+               type(r) as relationship_type, related.name as related_name
         """
         
-        variables = {"$id": feature_id}
-        
         try:
-            if self.dgraph_client:
-                result = self.dgraph_client.txn(read_only=True).query(query, variables=variables)
-                return result
+            if self.driver:
+                with self.driver.session() as session:
+                    result = session.run(query, feature_name=feature_name)
+                    records = list(result)
+                    return {"records": [dict(record) for record in records]}
             else:
-                logger.warning("⚠️  Dgraph client not available, showing query structure")
-                return {"query": query, "variables": variables}
+                logger.warning("⚠️  Neo4j driver not available, showing query structure")
+                return {"query": query, "parameters": {"feature_name": feature_name}}
         except Exception as e:
             logger.error(f"❌ Query failed: {e}")
             return {"error": str(e)}
@@ -181,7 +153,7 @@ class OSMQueryExamples:
         
         # Query 2: Features in San Francisco
         logger.info("\n2️⃣  Querying for features in San Francisco...")
-        result = self.query_features_by_location("San Francisco")
+        result = self.query_features_by_location("Francisco")
         self._display_query_result("San Francisco Features", result)
         
         # Query 3: Spatial query example
@@ -192,7 +164,7 @@ class OSMQueryExamples:
         
         # Query 4: Feature relationships
         logger.info("\n4️⃣  Feature relationships example...")
-        result = self.query_feature_relationships("example_uid")
+        result = self.query_feature_relationships("Sample Restaurant")
         self._display_query_result("Feature Relationships", result)
         
         logger.info("\n🎉 Sample queries completed!")
@@ -205,31 +177,36 @@ class OSMQueryExamples:
         if "error" in result:
             print(f"❌ Error: {result['error']}")
         elif "query" in result:
-            print("📝 Query Structure (Dgraph not connected):")
+            print("📝 Query Structure (Neo4j not connected):")
             print(f"Query: {result['query']}")
-            print(f"Variables: {result['variables']}")
+            print(f"Parameters: {result.get('parameters', {})}")
         else:
             # Display actual results
             print("✅ Query executed successfully")
-            if hasattr(result, 'json'):
-                print(f"Raw result: {result.json()}")
+            if "records" in result:
+                records = result["records"]
+                print(f"Found {len(records)} results:")
+                for i, record in enumerate(records[:5]):  # Show first 5 results
+                    print(f"  {i+1}. {record}")
+                if len(records) > 5:
+                    print(f"  ... and {len(records) - 5} more")
             else:
                 print(f"Result: {result}")
 
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description="Run sample queries on OSM data in Dgraph")
+    parser = argparse.ArgumentParser(description="Run sample queries on OSM data in Neo4j")
     parser.add_argument("--amenity", help="Query for specific amenity type")
     parser.add_argument("--location", help="Query for specific location")
     parser.add_argument("--spatial", help="Spatial query with bounding box (x1,y1,x2,y2)")
-    parser.add_argument("--feature", help="Query for specific feature ID")
+    parser.add_argument("--feature", help="Query for specific feature name")
     parser.add_argument("--all", action="store_true", help="Run all sample queries")
     
     args = parser.parse_args()
     
     # Load configuration
-    config = DgraphConfig()
+    config = Neo4jConfig()
     
     # Create query examples
     query_examples = OSMQueryExamples(config)

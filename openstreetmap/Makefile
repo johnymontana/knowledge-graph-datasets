@@ -1,18 +1,18 @@
 .PHONY: help install dev-install clean test format lint run-import run-validate run-query
 
 help: ## Show this help message
-	@echo "OSM Dgraph Importer - Available Commands:"
+	@echo "OSM Neo4j Importer - Available Commands:"
 	@echo ""
 	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
 
-config: ## Show current Dgraph configuration
-	uvx run dgraph_config.py
+config: ## Show current Neo4j configuration
+	uvx run neo4j_config.py
 
 config-example: ## Create example configuration file
 	@if [ ! -f config.env ]; then \
 		cp config.env.example config.env; \
 		echo "✅ Created config.env from example"; \
-		echo "📝 Edit config.env with your Dgraph connection details"; \
+		echo "📝 Edit config.env with your Neo4j connection details"; \
 	else \
 		echo "⚠️  config.env already exists"; \
 	fi
@@ -49,15 +49,15 @@ run-validate: ## Run OSM data validation
 run-query: ## Run sample queries
 	uvx run sample_queries.py
 
-start-dgraph: ## Start Dgraph services
+start-neo4j: ## Start Neo4j services
 	docker-compose up -d
 
-stop-dgraph: ## Stop Dgraph services
+stop-neo4j: ## Stop Neo4j services
 	docker-compose down
 
-logs: ## View Dgraph logs
-	docker-compose logs -f dgraph
+logs: ## View Neo4j logs
+	docker-compose logs -f neo4j
 
-status: ## Check Dgraph status
-	@echo "Checking Dgraph health..."
-	@curl -s http://localhost:8080/health || echo "Dgraph not responding"
+status: ## Check Neo4j status
+	@echo "Checking Neo4j health..."
+	@curl -s http://localhost:7474/browser/ || echo "Neo4j not responding"

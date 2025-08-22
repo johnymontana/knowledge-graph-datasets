@@ -1,10 +1,10 @@
 #!/usr/bin/env python3
 """
-OpenStreetMap to Dgraph Import Script
+OpenStreetMap to Neo4j Import Script
 
-This script imports OpenStreetMap data into Dgraph using OSMnx.
-It searches for OSM data based on location and tags, converts it to RDF format,
-and imports it into Dgraph for knowledge graph analysis.
+This script imports OpenStreetMap data into Neo4j using OSMnx.
+It searches for OSM data based on location and tags, converts it to Cypher format,
+and imports it into Neo4j for knowledge graph analysis.
 """
 
 import os
@@ -15,11 +15,8 @@ from typing import Dict, Any, List
 import osmnx as ox
 import geopandas as gpd
 import pandas as pd
-from rdflib import Graph, Namespace, Literal, URIRef
-from rdflib.namespace import RDF, RDFS, XSD, GEO
-import pydgraph
-import grpc
-from dgraph_config import DgraphConfig
+from neo4j import GraphDatabase
+from neo4j_config import Neo4jConfig
 
 # Configure logging
 logging.basicConfig(
@@ -28,52 +25,42 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# OSM namespaces
-OSM = Namespace("http://www.openstreetmap.org/")
-OSM_ONTOLOGY = Namespace("http://www.openstreetmap.org/ontology/")
-GEO_ONTOLOGY = Namespace("http://www.w3.org/2003/01/geo/wgs84_pos#")
+# Constants for Neo4j labels and relationships
+FEATURE_LABEL = "Feature"
+GEOMETRY_LABEL = "Geometry"
+HAS_GEOMETRY_REL = "HAS_GEOMETRY"
 
 
 class OSMImporter:
-    """Main class for importing OSM data into Dgraph."""
+    """Main class for importing OSM data into Neo4j."""
     
-    def __init__(self, config: DgraphConfig):
+    def __init__(self, config: Neo4jConfig):
         self.config = config
-        self.dgraph_client = None
-        self.graph = Graph()
-        self._setup_namespaces()
-        self._setup_dgraph()
+        self.driver = None
+        self.cypher_statements = []
+        self._setup_neo4j()
     
-    def _setup_namespaces(self):
-        """Setup RDF namespaces."""
-        self.graph.bind("osm", OSM)
-        self.graph.bind("osm-ont", OSM_ONTOLOGY)
-        self.graph.bind("geo", GEO_ONTOLOGY)
-        self.graph.bind("geo", GEO)
-    
-    def _setup_dgraph(self):
-        """Setup Dgraph client connection."""
+    def _setup_neo4j(self):
+        """Setup Neo4j driver connection."""
         try:
             conn_params = self.config.get_connection_params()
-            if 'connection_string' in conn_params:
-                # Use pydgraph.open() with the connection string directly
-                conn_str = conn_params['connection_string']
-                logger.info(f"Setting up Dgraph connection with: {conn_str}")
-                
-                self.dgraph_client = pydgraph.open(conn_str)
-                
-                # Test connection
-                version = self.dgraph_client.check_version()
-                logger.info(f"✅ Connected to Dgraph version: {version}")
-            else:
-                # Local connection
-                self.dgraph_client = pydgraph.DgraphClient(
-                    pydgraph.DgraphClientStub(conn_params['host'], conn_params['port'])
-                )
-                logger.info("✅ Connected to local Dgraph")
+            self.driver = GraphDatabase.driver(
+                conn_params['uri'],
+                auth=(conn_params['username'], conn_params['password'])
+            )
+            # Test connection
+            with self.driver.session() as session:
+                result = session.run("RETURN 1 as test")
+                result.single()
+            logger.info("✅ Connected to Neo4j")
         except Exception as e:
-            logger.error(f"❌ Failed to connect to Dgraph: {e}")
-            self.dgraph_client = None
+            logger.error(f"❌ Failed to connect to Neo4j: {e}")
+            self.driver = None
+    
+    def __del__(self):
+        """Close Neo4j driver on cleanup."""
+        if self.driver:
+            self.driver.close()
     
     def search_osm_data(self, location: str, tags: Dict[str, str]) -> gpd.GeoDataFrame:
         """Search for OSM data using OSMnx."""
@@ -95,174 +82,132 @@ class OSMImporter:
             logger.error(f"❌ Error searching OSM data: {e}")
             return gpd.GeoDataFrame()
     
-    def convert_to_rdf(self, gdf: gpd.GeoDataFrame) -> Graph:
-        """Convert GeoDataFrame to RDF format."""
-        logger.info("🔄 Converting OSM data to RDF format...")
+    def convert_to_cypher(self, gdf: gpd.GeoDataFrame):
+        """Convert GeoDataFrame to Cypher statements."""
+        logger.info("🔄 Converting OSM data to Cypher format...")
         
         for idx, row in gdf.iterrows():
-            # Create URI for the feature - properly handle tuple indices
+            # Create unique feature ID - properly handle tuple indices
             feature_id = str(idx).replace("'", "").replace(" ", "").replace("(", "").replace(")", "").replace(",", "_")
-            feature_uri = URIRef(f"{OSM}feature/{feature_id}")
             
-            # Add basic type information
-            self.graph.add((feature_uri, RDF.type, OSM_ONTOLOGY.Feature))
-            
-            # Add geometry information
-            if hasattr(row, 'geometry') and row.geometry:
-                geom_uri = URIRef(f"{OSM}geometry/{feature_id}")
-                self.graph.add((feature_uri, GEO_ONTOLOGY.geometry, geom_uri))
-                self.graph.add((geom_uri, RDF.type, GEO_ONTOLOGY.Geometry))
-                
-                # Add WKT representation
-                wkt_literal = Literal(row.geometry.wkt, datatype=XSD.string)
-                self.graph.add((geom_uri, GEO_ONTOLOGY.wkt, wkt_literal))
+            # Build feature properties
+            feature_props = {'osm_id': feature_id}
             
             # Add OSM tags as properties
             for col in gdf.columns:
                 if col not in ['geometry', 'index'] and pd.notna(row[col]):
                     if col.startswith('amenity'):
-                        self.graph.add((feature_uri, OSM_ONTOLOGY.amenity, Literal(row[col])))
+                        feature_props['amenity'] = str(row[col])
                     elif col.startswith('name'):
-                        self.graph.add((feature_uri, RDFS.label, Literal(row[col])))
+                        feature_props['name'] = str(row[col])
                     elif col.startswith('addr:'):
-                        self.graph.add((feature_uri, OSM_ONTOLOGY.address, Literal(row[col])))
+                        feature_props['address'] = str(row[col])
                     else:
-                        # Generic property
-                        prop_uri = URIRef(f"{OSM_ONTOLOGY}{col}")
-                        self.graph.add((feature_uri, prop_uri, Literal(row[col])))
+                        # Generic property (sanitize column name)
+                        clean_col = col.replace(':', '_').replace('-', '_')
+                        feature_props[clean_col] = str(row[col])
+            
+            # Create Cypher statement for feature
+            props_str = ', '.join([f"{k}: ${k}" for k in feature_props.keys()])
+            feature_cypher = f"CREATE (f:{FEATURE_LABEL} {{{props_str}}})"
+            self.cypher_statements.append((feature_cypher, feature_props))
+            
+            # Add geometry if available
+            if hasattr(row, 'geometry') and row.geometry:
+                geom_id = f"geom_{feature_id}"
+                geom_props = {
+                    'geom_id': geom_id,
+                    'wkt': row.geometry.wkt
+                }
+                
+                # Create geometry node and relationship
+                geom_cypher = f"CREATE (g:{GEOMETRY_LABEL} {{geom_id: $geom_id, wkt: $wkt}})"
+                self.cypher_statements.append((geom_cypher, geom_props))
+                
+                # Create relationship
+                rel_cypher = f"MATCH (f:{FEATURE_LABEL} {{osm_id: $feature_id}}), (g:{GEOMETRY_LABEL} {{geom_id: $geom_id}}) CREATE (f)-[:{HAS_GEOMETRY_REL}]->(g)"
+                rel_props = {'feature_id': feature_id, 'geom_id': geom_id}
+                self.cypher_statements.append((rel_cypher, rel_props))
         
-        logger.info(f"✅ Converted {len(gdf)} features to RDF")
-        return self.graph
+        logger.info(f"✅ Converted {len(gdf)} features to Cypher statements")
     
-    def save_rdf(self, output_file: str):
-        """Save RDF data to file."""
+    def save_cypher(self, output_file: str):
+        """Save Cypher statements to file."""
         try:
             output_path = os.path.join(self.config.data_dir, output_file)
-            self.graph.serialize(destination=output_path, format='xml')
-            logger.info(f"💾 RDF data saved to: {output_path}")
+            with open(output_path, 'w', encoding='utf-8') as f:
+                for cypher, params in self.cypher_statements:
+                    # Write the Cypher statement with parameters as comments
+                    f.write(f"// Parameters: {params}\n")
+                    f.write(f"{cypher};\n\n")
+            logger.info(f"💾 Cypher data saved to: {output_path}")
         except Exception as e:
-            logger.error(f"❌ Error saving RDF file: {e}")
+            logger.error(f"❌ Error saving Cypher file: {e}")
     
-    def import_to_dgraph(self) -> bool:
-        """Import RDF data into Dgraph."""
-        if not self.dgraph_client:
-            logger.error("❌ Dgraph client not available")
+    def import_to_neo4j(self) -> bool:
+        """Import Cypher data into Neo4j."""
+        if not self.driver:
+            logger.error("❌ Neo4j driver not available")
             return False
         
         try:
-            logger.info("🚀 Importing RDF data into Dgraph...")
+            logger.info("🚀 Importing data into Neo4j...")
             
-            # First, set up the schema
+            # First, set up constraints and indexes
             self._setup_schema()
             
-            # Convert RDF to Dgraph mutations
-            mutations = self._convert_rdf_to_mutations()
-            
-            # Batch the mutations and import
+            # Batch the statements and import
             batch_size = self.config.batch_size
-            total_mutations = len(mutations)
-            logger.info(f"📊 Importing {total_mutations} mutations in batches of {batch_size}")
+            total_statements = len(self.cypher_statements)
+            logger.info(f"📊 Importing {total_statements} statements in batches of {batch_size}")
             
-            for i in range(0, total_mutations, batch_size):
-                batch = mutations[i:i + batch_size]
-                txn = self.dgraph_client.txn()
-                
-                try:
-                    # Create the mutation with proper JSON encoding
-                    import json
-                    json_data = json.dumps(batch).encode('utf-8')
-                    mutation = pydgraph.Mutation(set_json=json_data)
-                    response = txn.mutate(mutation)
-                    txn.commit()
-                    logger.info(f"✅ Imported batch {i//batch_size + 1}/{(total_mutations-1)//batch_size + 1}")
-                except Exception as e:
-                    logger.error(f"❌ Error in batch {i//batch_size + 1}: {e}")
-                    txn.discard()
-                finally:
-                    txn.discard()
+            with self.driver.session() as session:
+                for i in range(0, total_statements, batch_size):
+                    batch = self.cypher_statements[i:i + batch_size]
+                    
+                    try:
+                        # Execute statements in a transaction
+                        def execute_batch(tx):
+                            for cypher, params in batch:
+                                tx.run(cypher, params)
+                        
+                        session.execute_write(execute_batch)
+                        logger.info(f"✅ Imported batch {i//batch_size + 1}/{(total_statements-1)//batch_size + 1}")
+                    except Exception as e:
+                        logger.error(f"❌ Error in batch {i//batch_size + 1}: {e}")
+                        # Continue with next batch
             
-            logger.info("🎉 Successfully imported all data to Dgraph!")
+            logger.info("🎉 Successfully imported all data to Neo4j!")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error importing to Dgraph: {e}")
+            logger.error(f"❌ Error importing to Neo4j: {e}")
             return False
     
     def _setup_schema(self):
-        """Setup Dgraph schema for OSM data."""
-        schema = '''
-        type Feature {
-            name: string
-            amenity: string
-            address: string
-            geometry: Geometry
-            osm_id: string
-        }
-        
-        type Geometry {
-            wkt: string
-        }
-        
-        name: string @index(term, fulltext) .
-        amenity: string @index(exact, term) .
-        address: string @index(term, fulltext) .
-        osm_id: string @index(exact) .
-        wkt: string .
-        geometry: [uid] @reverse .
-        '''
+        """Setup Neo4j constraints and indexes for OSM data."""
+        constraints_and_indexes = [
+            f"CREATE CONSTRAINT feature_osm_id IF NOT EXISTS FOR (f:{FEATURE_LABEL}) REQUIRE f.osm_id IS UNIQUE",
+            f"CREATE CONSTRAINT geometry_geom_id IF NOT EXISTS FOR (g:{GEOMETRY_LABEL}) REQUIRE g.geom_id IS UNIQUE",
+            f"CREATE INDEX feature_name IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.name)",
+            f"CREATE INDEX feature_amenity IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.amenity)",
+            f"CREATE INDEX feature_address IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.address)",
+        ]
         
         try:
-            op = pydgraph.Operation(schema=schema)
-            self.dgraph_client.alter(op)
-            logger.info("✅ Schema updated successfully")
+            with self.driver.session() as session:
+                for constraint in constraints_and_indexes:
+                    try:
+                        session.run(constraint)
+                    except Exception as e:
+                        # Constraint might already exist, which is fine
+                        logger.debug(f"Constraint/Index operation result: {e}")
+            logger.info("✅ Schema setup completed successfully")
         except Exception as e:
-            logger.warning(f"⚠️  Schema update warning: {e}")
+            logger.warning(f"⚠️  Schema setup warning: {e}")
     
-    def _convert_rdf_to_mutations(self) -> List[Dict]:
-        """Convert RDF graph to Dgraph mutations."""
-        mutations = []
-        features = {}  # Store feature data by URI
-        geometries = {}  # Store geometry data by URI
-        
-        # Process RDF triples
-        for subject, predicate, obj in self.graph:
-            subject_str = str(subject)
-            predicate_str = str(predicate)
-            
-            if '/feature/' in subject_str:
-                # This is a feature
-                if subject_str not in features:
-                    features[subject_str] = {'dgraph.type': 'Feature'}
-                
-                if predicate_str.endswith('#label'):
-                    features[subject_str]['name'] = str(obj)
-                elif predicate_str.endswith('amenity'):
-                    features[subject_str]['amenity'] = str(obj)
-                elif predicate_str.endswith('address'):
-                    features[subject_str]['address'] = str(obj)
-                elif predicate_str.endswith('geometry'):
-                    # Link to geometry
-                    features[subject_str]['geometry'] = [{'uid': f'_:{str(obj)}'}]
-                
-                # Add OSM ID from the URI
-                if '/feature/' in subject_str:
-                    osm_id = subject_str.split('/feature/')[-1]
-                    features[subject_str]['osm_id'] = osm_id
-            
-            elif '/geometry/' in subject_str:
-                # This is a geometry
-                if subject_str not in geometries:
-                    geometries[subject_str] = {'dgraph.type': 'Geometry', 'uid': f'_:{subject_str}'}
-                
-                if predicate_str.endswith('wkt'):
-                    geometries[subject_str]['wkt'] = str(obj)
-        
-        # Convert to mutation format
-        mutations.extend(features.values())
-        mutations.extend(geometries.values())
-        
-        logger.info(f"🔄 Converted {len(features)} features and {len(geometries)} geometries to mutations")
-        return mutations
+    # Note: This method is no longer needed since we directly generate Cypher statements
+    # in the convert_to_cypher method
     
     def run_import(self) -> bool:
         """Run the complete import process."""
@@ -285,14 +230,14 @@ class OSMImporter:
                 logger.error("❌ No data to import")
                 return False
             
-            # Convert to RDF
-            self.convert_to_rdf(gdf)
+            # Convert to Cypher
+            self.convert_to_cypher(gdf)
             
-            # Save RDF file
-            self.save_rdf(osm_config['output_file'])
+            # Save Cypher file
+            self.save_cypher(osm_config['output_file'])
             
-            # Import to Dgraph
-            success = self.import_to_dgraph()
+            # Import to Neo4j
+            success = self.import_to_neo4j()
             
             if success:
                 logger.info("🎉 OSM import completed successfully!")
@@ -308,15 +253,15 @@ class OSMImporter:
 
 def main():
     """Main function."""
-    parser = argparse.ArgumentParser(description="Import OpenStreetMap data into Dgraph")
+    parser = argparse.ArgumentParser(description="Import OpenStreetMap data into Neo4j")
     parser.add_argument("--location", help="OSM location to search")
     parser.add_argument("--tags", help="OSM tags to filter by (e.g., amenity=restaurant)")
-    parser.add_argument("--output", help="Output RDF filename")
+    parser.add_argument("--output", help="Output Cypher filename")
     
     args = parser.parse_args()
     
     # Load configuration
-    config = DgraphConfig()
+    config = Neo4jConfig()
     
     # Override config with command line arguments
     if args.location:

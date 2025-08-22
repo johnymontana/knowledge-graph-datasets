@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """
-Enhanced OpenStreetMap to Dgraph Import Script
+Enhanced OpenStreetMap to Neo4j Import Script
 
-This script imports OpenStreetMap data into Dgraph using OSMnx with enhanced
+This script imports OpenStreetMap data into Neo4j using OSMnx with enhanced
 road network and routing capabilities. It can import:
 - Road networks with intersections
 - Amenity features (restaurants, shops, etc.)
@@ -20,11 +20,8 @@ import geopandas as gpd
 import pandas as pd
 import networkx as nx
 from shapely.geometry import Point, LineString
-from rdflib import Graph, Namespace, Literal, URIRef
-from rdflib.namespace import RDF, RDFS, XSD, GEO
-import pydgraph
-import grpc
-from dgraph_config import DgraphConfig
+from neo4j import GraphDatabase
+from neo4j_config import Neo4jConfig
 
 # Configure logging
 logging.basicConfig(
@@ -33,49 +30,48 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# OSM namespaces
-OSM = Namespace("http://www.openstreetmap.org/")
-OSM_ONTOLOGY = Namespace("http://www.openstreetmap.org/ontology/")
-GEO_ONTOLOGY = Namespace("http://www.w3.org/2003/01/geo/wgs84_pos#")
+# Constants for Neo4j labels and relationships
+FEATURE_LABEL = "Feature"
+GEOMETRY_LABEL = "Geometry"
+INTERSECTION_LABEL = "Intersection"
+ROAD_LABEL = "Road"
+HAS_GEOMETRY_REL = "HAS_GEOMETRY"
+FROM_INTERSECTION_REL = "FROM_INTERSECTION"
+TO_INTERSECTION_REL = "TO_INTERSECTION"
 
 
 class EnhancedOSMImporter:
     """Enhanced OSM importer with road network and routing capabilities."""
     
-    def __init__(self, config: DgraphConfig):
+    def __init__(self, config: Neo4jConfig):
         self.config = config
-        self.dgraph_client = None
-        self.graph = Graph()
+        self.driver = None
+        self.cypher_statements = []
         self.road_network = None
         self.intersections = {}
-        self._setup_namespaces()
-        self._setup_dgraph()
+        self._setup_neo4j()
     
-    def _setup_namespaces(self):
-        """Setup RDF namespaces."""
-        self.graph.bind("osm", OSM)
-        self.graph.bind("osm-ont", OSM_ONTOLOGY)
-        self.graph.bind("geo", GEO_ONTOLOGY)
-        self.graph.bind("geo", GEO)
-    
-    def _setup_dgraph(self):
-        """Setup Dgraph client connection."""
+    def _setup_neo4j(self):
+        """Setup Neo4j driver connection."""
         try:
             conn_params = self.config.get_connection_params()
-            if 'connection_string' in conn_params:
-                conn_str = conn_params['connection_string']
-                logger.info(f"Setting up Dgraph connection with: {conn_str}")
-                self.dgraph_client = pydgraph.open(conn_str)
-                version = self.dgraph_client.check_version()
-                logger.info(f"✅ Connected to Dgraph version: {version}")
-            else:
-                self.dgraph_client = pydgraph.DgraphClient(
-                    pydgraph.DgraphClientStub(conn_params['host'], conn_params['port'])
-                )
-                logger.info("✅ Connected to local Dgraph")
+            self.driver = GraphDatabase.driver(
+                conn_params['uri'],
+                auth=(conn_params['username'], conn_params['password'])
+            )
+            # Test connection
+            with self.driver.session() as session:
+                result = session.run("RETURN 1 as test")
+                result.single()
+            logger.info("✅ Connected to Neo4j")
         except Exception as e:
-            logger.error(f"❌ Failed to connect to Dgraph: {e}")
-            self.dgraph_client = None
+            logger.error(f"❌ Failed to connect to Neo4j: {e}")
+            self.driver = None
+    
+    def __del__(self):
+        """Close Neo4j driver on cleanup."""
+        if self.driver:
+            self.driver.close()
     
     def get_road_network(self, location: str) -> nx.MultiDiGraph:
         """Get road network from OSM using OSMnx."""
@@ -189,217 +185,180 @@ class EnhancedOSMImporter:
             logger.error(f"❌ Error getting amenities: {e}")
             return gpd.GeoDataFrame()
     
-    def convert_to_rdf(self, roads: List[Dict], intersections: Dict, amenities: gpd.GeoDataFrame):
-        """Convert all data to RDF format."""
-        logger.info("🔄 Converting data to RDF format...")
+    def convert_to_cypher(self, roads: List[Dict], intersections: Dict, amenities: gpd.GeoDataFrame):
+        """Convert all data to Cypher format."""
+        logger.info("🔄 Converting data to Cypher format...")
         
         # Convert intersections
         for node_id, node_data in intersections.items():
-            intersection_uri = URIRef(f"{OSM}intersection/{node_id}")
-            self.graph.add((intersection_uri, RDF.type, OSM_ONTOLOGY.Intersection))
-            self.graph.add((intersection_uri, OSM_ONTOLOGY.osm_id, Literal(str(node_id))))
-            self.graph.add((intersection_uri, OSM_ONTOLOGY.latitude, Literal(node_data['lat'])))
-            self.graph.add((intersection_uri, OSM_ONTOLOGY.longitude, Literal(node_data['lon'])))
+            intersection_props = {
+                'osm_id': str(node_id),
+                'latitude': node_data['lat'],
+                'longitude': node_data['lon']
+            }
             
-            # Add geometry
-            geom_uri = URIRef(f"{OSM}geometry/intersection_{node_id}")
+            # Create intersection node
+            props_str = ', '.join([f"{k}: ${k}" for k in intersection_props.keys()])
+            intersection_cypher = f"CREATE (i:{INTERSECTION_LABEL} {{{props_str}}})"
+            self.cypher_statements.append((intersection_cypher, intersection_props))
+            
+            # Create geometry for intersection
+            geom_id = f"geom_intersection_{node_id}"
             point = Point(node_data['x'], node_data['y'])
-            self.graph.add((intersection_uri, GEO_ONTOLOGY.geometry, geom_uri))
-            self.graph.add((geom_uri, RDF.type, GEO_ONTOLOGY.Geometry))
-            self.graph.add((geom_uri, GEO_ONTOLOGY.wkt, Literal(point.wkt)))
+            geom_props = {
+                'geom_id': geom_id,
+                'wkt': point.wkt
+            }
+            
+            geom_cypher = f"CREATE (g:{GEOMETRY_LABEL} {{geom_id: $geom_id, wkt: $wkt}})"
+            self.cypher_statements.append((geom_cypher, geom_props))
+            
+            # Create relationship
+            rel_cypher = f"MATCH (i:{INTERSECTION_LABEL} {{osm_id: $osm_id}}), (g:{GEOMETRY_LABEL} {{geom_id: $geom_id}}) CREATE (i)-[:{HAS_GEOMETRY_REL}]->(g)"
+            rel_props = {'osm_id': str(node_id), 'geom_id': geom_id}
+            self.cypher_statements.append((rel_cypher, rel_props))
         
         # Convert roads
         for road in roads:
-            road_uri = URIRef(f"{OSM}road/{road['osm_id']}")
-            self.graph.add((road_uri, RDF.type, OSM_ONTOLOGY.Road))
-            self.graph.add((road_uri, OSM_ONTOLOGY.osm_id, Literal(road['osm_id'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.highway, Literal(road['highway'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.oneway, Literal(road['oneway'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.lanes, Literal(road['lanes'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.maxspeed, Literal(road['maxspeed'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.surface, Literal(road['surface'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.ref, Literal(road['ref'])))
-            self.graph.add((road_uri, OSM_ONTOLOGY.length, Literal(road['length'])))
+            road_props = {
+                'osm_id': road['osm_id'],
+                'highway': road['highway'],
+                'oneway': road['oneway'],
+                'lanes': road['lanes'],
+                'maxspeed': road['maxspeed'],
+                'surface': road['surface'],
+                'ref': road['ref'],
+                'length': road['length']
+            }
             
             # Add name if available
             if road['name']:
-                self.graph.add((road_uri, RDFS.label, Literal(road['name'])))
+                road_props['name'] = road['name']
             
-            # Link to intersections
-            from_intersection = URIRef(f"{OSM}intersection/{road['from_node']}")
-            to_intersection = URIRef(f"{OSM}intersection/{road['to_node']}")
-            self.graph.add((road_uri, OSM_ONTOLOGY.from_intersection, from_intersection))
-            self.graph.add((road_uri, OSM_ONTOLOGY.to_intersection, to_intersection))
+            # Create road node
+            props_str = ', '.join([f"{k}: ${k}" for k in road_props.keys()])
+            road_cypher = f"CREATE (r:{ROAD_LABEL} {{{props_str}}})"
+            self.cypher_statements.append((road_cypher, road_props))
             
-            # Add geometry
-            if 'geometry' in road:
-                geom_uri = URIRef(f"{OSM}geometry/road_{road['osm_id']}")
-                self.graph.add((road_uri, GEO_ONTOLOGY.geometry, geom_uri))
-                self.graph.add((geom_uri, RDF.type, GEO_ONTOLOGY.Geometry))
-                self.graph.add((geom_uri, GEO_ONTOLOGY.wkt, Literal(road['geometry'].wkt)))
+            # Create relationships to intersections
+            from_rel_cypher = f"MATCH (r:{ROAD_LABEL} {{osm_id: $road_id}}), (i:{INTERSECTION_LABEL} {{osm_id: $from_node}}) CREATE (r)-[:{FROM_INTERSECTION_REL}]->(i)"
+            from_rel_props = {'road_id': road['osm_id'], 'from_node': str(road['from_node'])}
+            self.cypher_statements.append((from_rel_cypher, from_rel_props))
+            
+            to_rel_cypher = f"MATCH (r:{ROAD_LABEL} {{osm_id: $road_id}}), (i:{INTERSECTION_LABEL} {{osm_id: $to_node}}) CREATE (r)-[:{TO_INTERSECTION_REL}]->(i)"
+            to_rel_props = {'road_id': road['osm_id'], 'to_node': str(road['to_node'])}
+            self.cypher_statements.append((to_rel_cypher, to_rel_props))
         
         # Convert amenities
         for idx, row in amenities.iterrows():
             feature_id = str(idx).replace("'", "").replace(" ", "").replace("(", "").replace(")", "").replace(",", "_")
-            feature_uri = URIRef(f"{OSM}feature/{feature_id}")
             
-            self.graph.add((feature_uri, RDF.type, OSM_ONTOLOGY.Feature))
-            
-            # Add geometry
-            if hasattr(row, 'geometry') and row.geometry:
-                geom_uri = URIRef(f"{OSM}geometry/{feature_id}")
-                self.graph.add((feature_uri, GEO_ONTOLOGY.geometry, geom_uri))
-                self.graph.add((geom_uri, RDF.type, GEO_ONTOLOGY.Geometry))
-                self.graph.add((geom_uri, GEO_ONTOLOGY.wkt, Literal(row.geometry.wkt)))
+            # Build feature properties
+            feature_props = {'osm_id': feature_id}
             
             # Add properties
             for col in amenities.columns:
                 if col not in ['geometry', 'index'] and pd.notna(row[col]):
                     if col.startswith('amenity'):
-                        self.graph.add((feature_uri, OSM_ONTOLOGY.amenity, Literal(row[col])))
+                        feature_props['amenity'] = str(row[col])
                     elif col.startswith('name'):
-                        self.graph.add((feature_uri, RDFS.label, Literal(row[col])))
+                        feature_props['name'] = str(row[col])
                     elif col.startswith('addr:'):
-                        self.graph.add((feature_uri, OSM_ONTOLOGY.address, Literal(row[col])))
+                        feature_props['address'] = str(row[col])
                     else:
-                        prop_uri = URIRef(f"{OSM_ONTOLOGY}{col}")
-                        self.graph.add((feature_uri, prop_uri, Literal(row[col])))
+                        # Generic property (sanitize column name)
+                        clean_col = col.replace(':', '_').replace('-', '_')
+                        feature_props[clean_col] = str(row[col])
+            
+            # Create feature node
+            props_str = ', '.join([f"{k}: ${k}" for k in feature_props.keys()])
+            feature_cypher = f"CREATE (f:{FEATURE_LABEL} {{{props_str}}})"
+            self.cypher_statements.append((feature_cypher, feature_props))
+            
+            # Add geometry if available
+            if hasattr(row, 'geometry') and row.geometry:
+                geom_id = f"geom_{feature_id}"
+                geom_props = {
+                    'geom_id': geom_id,
+                    'wkt': row.geometry.wkt
+                }
+                
+                # Create geometry node and relationship
+                geom_cypher = f"CREATE (g:{GEOMETRY_LABEL} {{geom_id: $geom_id, wkt: $wkt}})"
+                self.cypher_statements.append((geom_cypher, geom_props))
+                
+                # Create relationship
+                rel_cypher = f"MATCH (f:{FEATURE_LABEL} {{osm_id: $feature_id}}), (g:{GEOMETRY_LABEL} {{geom_id: $geom_id}}) CREATE (f)-[:{HAS_GEOMETRY_REL}]->(g)"
+                rel_props = {'feature_id': feature_id, 'geom_id': geom_id}
+                self.cypher_statements.append((rel_cypher, rel_props))
         
-        logger.info(f"✅ Converted {len(intersections)} intersections, {len(roads)} roads, and {len(amenities)} amenities to RDF")
+        logger.info(f"✅ Converted {len(intersections)} intersections, {len(roads)} roads, and {len(amenities)} amenities to Cypher statements")
     
-    def import_to_dgraph(self) -> bool:
-        """Import RDF data into Dgraph."""
-        if not self.dgraph_client:
-            logger.error("❌ Dgraph client not available")
+    def import_to_neo4j(self) -> bool:
+        """Import Cypher data into Neo4j."""
+        if not self.driver:
+            logger.error("❌ Neo4j driver not available")
             return False
         
         try:
-            logger.info("🚀 Importing RDF data into Dgraph...")
+            logger.info("🚀 Importing data into Neo4j...")
             
-            # Convert RDF to Dgraph mutations
-            mutations = self._convert_rdf_to_mutations()
+            # First, set up constraints and indexes
+            self._setup_schema()
             
-            # Batch the mutations and import
+            # Batch the statements and import
             batch_size = self.config.batch_size
-            total_mutations = len(mutations)
-            logger.info(f"📊 Importing {total_mutations} mutations in batches of {batch_size}")
+            total_statements = len(self.cypher_statements)
+            logger.info(f"📊 Importing {total_statements} statements in batches of {batch_size}")
             
-            for i in range(0, total_mutations, batch_size):
-                batch = mutations[i:i + batch_size]
-                txn = self.dgraph_client.txn()
-                
-                try:
-                    import json
-                    json_data = json.dumps(batch).encode('utf-8')
-                    mutation = pydgraph.Mutation(set_json=json_data)
-                    response = txn.mutate(mutation)
-                    txn.commit()
-                    logger.info(f"✅ Imported batch {i//batch_size + 1}/{(total_mutations-1)//batch_size + 1}")
-                except Exception as e:
-                    logger.error(f"❌ Error in batch {i//batch_size + 1}: {e}")
-                    txn.discard()
-                finally:
-                    txn.discard()
+            with self.driver.session() as session:
+                for i in range(0, total_statements, batch_size):
+                    batch = self.cypher_statements[i:i + batch_size]
+                    
+                    try:
+                        # Execute statements in a transaction
+                        def execute_batch(tx):
+                            for cypher, params in batch:
+                                tx.run(cypher, params)
+                        
+                        session.execute_write(execute_batch)
+                        logger.info(f"✅ Imported batch {i//batch_size + 1}/{(total_statements-1)//batch_size + 1}")
+                    except Exception as e:
+                        logger.error(f"❌ Error in batch {i//batch_size + 1}: {e}")
+                        # Continue with next batch
             
-            logger.info("🎉 Successfully imported all data to Dgraph!")
+            logger.info("🎉 Successfully imported all data to Neo4j!")
             return True
             
         except Exception as e:
-            logger.error(f"❌ Error importing to Dgraph: {e}")
+            logger.error(f"❌ Error importing to Neo4j: {e}")
             return False
     
-    def _convert_rdf_to_mutations(self) -> List[Dict]:
-        """Convert RDF graph to Dgraph mutations."""
-        mutations = []
-        features = {}
-        geometries = {}
-        intersections = {}
-        roads = {}
+    def _setup_schema(self):
+        """Setup Neo4j constraints and indexes for OSM data."""
+        constraints_and_indexes = [
+            f"CREATE CONSTRAINT feature_osm_id IF NOT EXISTS FOR (f:{FEATURE_LABEL}) REQUIRE f.osm_id IS UNIQUE",
+            f"CREATE CONSTRAINT geometry_geom_id IF NOT EXISTS FOR (g:{GEOMETRY_LABEL}) REQUIRE g.geom_id IS UNIQUE",
+            f"CREATE CONSTRAINT intersection_osm_id IF NOT EXISTS FOR (i:{INTERSECTION_LABEL}) REQUIRE i.osm_id IS UNIQUE",
+            f"CREATE CONSTRAINT road_osm_id IF NOT EXISTS FOR (r:{ROAD_LABEL}) REQUIRE r.osm_id IS UNIQUE",
+            f"CREATE INDEX feature_name IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.name)",
+            f"CREATE INDEX feature_amenity IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.amenity)",
+            f"CREATE INDEX feature_address IF NOT EXISTS FOR (f:{FEATURE_LABEL}) ON (f.address)",
+            f"CREATE INDEX intersection_lat_lon IF NOT EXISTS FOR (i:{INTERSECTION_LABEL}) ON (i.latitude, i.longitude)",
+            f"CREATE INDEX road_highway IF NOT EXISTS FOR (r:{ROAD_LABEL}) ON (r.highway)",
+        ]
         
-        # Process RDF triples
-        for subject, predicate, obj in self.graph:
-            subject_str = str(subject)
-            predicate_str = str(predicate)
-            
-            if '/intersection/' in subject_str:
-                # This is an intersection
-                if subject_str not in intersections:
-                    intersections[subject_str] = {'dgraph.type': 'Intersection'}
-                
-                if predicate_str.endswith('osm_id'):
-                    intersections[subject_str]['osm_id'] = str(obj)
-                elif predicate_str.endswith('latitude'):
-                    intersections[subject_str]['latitude'] = float(obj)
-                elif predicate_str.endswith('longitude'):
-                    intersections[subject_str]['longitude'] = float(obj)
-                elif predicate_str.endswith('geometry'):
-                    intersections[subject_str]['geometry'] = [{'uid': f'_:{str(obj)}'}]
-            
-            elif '/road/' in subject_str:
-                # This is a road
-                if subject_str not in roads:
-                    roads[subject_str] = {'dgraph.type': 'Road'}
-                
-                if predicate_str.endswith('osm_id'):
-                    roads[subject_str]['osm_id'] = str(obj)
-                elif predicate_str.endswith('highway'):
-                    roads[subject_str]['highway'] = str(obj)
-                elif predicate_str.endswith('oneway'):
-                    roads[subject_str]['oneway'] = bool(obj)
-                elif predicate_str.endswith('lanes'):
-                    roads[subject_str]['lanes'] = int(obj)
-                elif predicate_str.endswith('maxspeed'):
-                    roads[subject_str]['maxspeed'] = int(obj)
-                elif predicate_str.endswith('surface'):
-                    roads[subject_str]['surface'] = str(obj)
-                elif predicate_str.endswith('ref'):
-                    roads[subject_str]['ref'] = str(obj)
-                elif predicate_str.endswith('length'):
-                    roads[subject_str]['length'] = float(obj)
-                elif predicate_str.endswith('label'):
-                    roads[subject_str]['name'] = str(obj)
-                elif predicate_str.endswith('from_intersection'):
-                    roads[subject_str]['from_intersection'] = {'uid': f'_:{str(obj)}'}
-                elif predicate_str.endswith('to_intersection'):
-                    roads[subject_str]['to_intersection'] = {'uid': str(obj)}
-                elif predicate_str.endswith('geometry'):
-                    roads[subject_str]['geometry'] = [{'uid': f'_:{str(obj)}'}]
-            
-            elif '/feature/' in subject_str:
-                # This is a feature (amenity)
-                if subject_str not in features:
-                    features[subject_str] = {'dgraph.type': 'Feature'}
-                
-                if predicate_str.endswith('label'):
-                    features[subject_str]['name'] = str(obj)
-                elif predicate_str.endswith('amenity'):
-                    features[subject_str]['amenity'] = str(obj)
-                elif predicate_str.endswith('address'):
-                    features[subject_str]['address'] = str(obj)
-                elif predicate_str.endswith('geometry'):
-                    features[subject_str]['geometry'] = [{'uid': f'_:{str(obj)}'}]
-                
-                # Add OSM ID from the URI
-                if '/feature/' in subject_str:
-                    osm_id = subject_str.split('/feature/')[-1]
-                    features[subject_str]['osm_id'] = osm_id
-            
-            elif '/geometry/' in subject_str:
-                # This is a geometry
-                if subject_str not in geometries:
-                    geometries[subject_str] = {'dgraph.type': 'Geometry', 'uid': f'_:{subject_str}'}
-                
-                if predicate_str.endswith('wkt'):
-                    geometries[subject_str]['wkt'] = str(obj)
-        
-        # Convert to mutation format
-        mutations.extend(intersections.values())
-        mutations.extend(roads.values())
-        mutations.extend(features.values())
-        mutations.extend(geometries.values())
-        
-        logger.info(f"🔄 Converted {len(intersections)} intersections, {len(roads)} roads, {len(features)} features, and {len(geometries)} geometries to mutations")
-        return mutations
+        try:
+            with self.driver.session() as session:
+                for constraint in constraints_and_indexes:
+                    try:
+                        session.run(constraint)
+                    except Exception as e:
+                        # Constraint might already exist, which is fine
+                        logger.debug(f"Constraint/Index operation result: {e}")
+            logger.info("✅ Schema setup completed successfully")
+        except Exception as e:
+            logger.warning(f"⚠️  Schema setup warning: {e}")
     
     def run_import(self) -> bool:
         """Run the complete enhanced import process."""
@@ -427,11 +386,11 @@ class EnhancedOSMImporter:
             
             amenities = self.get_amenities(osm_config['location'], tags)
             
-            # Convert to RDF
-            self.convert_to_rdf(roads, self.intersections, amenities)
+            # Convert to Cypher
+            self.convert_to_cypher(roads, self.intersections, amenities)
             
-            # Import to Dgraph
-            success = self.import_to_dgraph()
+            # Import to Neo4j
+            success = self.import_to_neo4j()
             
             if success:
                 logger.info("🎉 Enhanced OSM import completed successfully!")
@@ -450,12 +409,12 @@ def main():
     parser = argparse.ArgumentParser(description="Enhanced OSM import with road networks and routing")
     parser.add_argument("--location", help="OSM location to search")
     parser.add_argument("--tags", help="OSM tags to filter by (e.g., amenity=restaurant)")
-    parser.add_argument("--output", help="Output RDF filename")
+    parser.add_argument("--output", help="Output Cypher filename")
     
     args = parser.parse_args()
     
     # Load configuration
-    config = DgraphConfig()
+    config = Neo4jConfig()
     
     # Override config with command line arguments
     if args.location:
