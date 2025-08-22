@@ -1,6 +1,6 @@
 # Knowledge Graph Datasets
 
-This repository contains various knowledge graph datasets and import tools for building comprehensive knowledge graphs using Dgraph.
+This repository contains various knowledge graph datasets and import tools.
 
 ## 🚌 GTFS Transit Data Import
 
