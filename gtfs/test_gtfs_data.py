@@ -3,7 +3,7 @@
 GTFS Data Validation Script
 
 This script validates and provides an overview of GTFS data files
-before importing them into Dgraph.
+before importing them into Neo4j.
 """
 
 import os

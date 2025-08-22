@@ -1,17 +1,22 @@
 [project]
-name = "gtfs-neo4j-importer"
+name = "osm-neo4j-importer"
 version = "0.1.0"
-description = "GTFS to Neo4j knowledge graph importer"
+description = "OpenStreetMap to Neo4j knowledge graph importer using OSMnx"
 authors = [
-    {name = "GTFS Import Project", email = ""}
+    {name = "OSM Import Project", email = ""}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
 dependencies = [
+    "osmnx>=1.3.0",
+    "geopandas>=0.12.2",
+    "shapely>=2.0.1",
+    "networkx>=3.1",
+    "matplotlib>=3.7.1",
+    "python-dotenv>=1.0.0",
+    "neo4j>=5.15.0",
     "requests>=2.25.1",
     "pandas>=1.3.0",
-    "python-dotenv>=1.0.0",
-    "neo4j>=5.0.0",
 ]
 
 [project.optional-dependencies]
@@ -22,9 +27,9 @@ dev = [
 ]
 
 [project.scripts]
-gtfs-import = "gtfs_import_neo4j:main"
-gtfs-validate = "test_gtfs_data:main"
-gtfs-query = "sample_queries_neo4j:main"
+osm-import = "osm_import:main"
+osm-validate = "test_osm_data:main"
+osm-query = "sample_queries:main"
 
 [build-system]
 requires = ["hatchling"]

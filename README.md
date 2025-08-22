@@ -55,8 +55,7 @@ uvx run sample_queries.py
 
 ### Documentation
 
-- **`gtfs/README_GTFS_Import.md`** - Detailed usage instructions
-- **`gtfs/PROJECT_OVERVIEW.md`** - Comprehensive project documentation
+- **`gtfs/README.md`** - Detailed usage instructions
 - **`gtfs/docker-compose.yml`** - Dgraph setup configuration
 
 ### Features
@@ -69,72 +68,91 @@ uvx run sample_queries.py
 
 See the `gtfs/` directory for complete project details and implementation.
 
-## 📰 News Knowledge Graph Import
+## 🗺️ OpenStreetMap Geospatial Data Import
 
-The `news/` directory contains a comprehensive system for creating knowledge graphs from news articles using Dgraph, AI embeddings, and vector similarity search. This project converts the original HyperNews system to follow modern Python development practices.
+The OpenStreetMap project is located in the `openstreetmap/` directory and provides a complete solution for importing OpenStreetMap (OSM) data into Dgraph using the OSMnx Python package.
 
 ### Prerequisites
 
 - Python 3.8+
 - [uv](https://docs.astral.sh/uv/) package manager
 - Dgraph instance (local or remote)
-- AI API keys (OpenAI, Anthropic, or Ollama for local models)
 - Configuration file with Dgraph connection details
 
 ### Quick Start
 
 ```bash
-# Navigate to the news project directory
-cd news
+# Navigate to the OSM project directory
+cd openstreetmap
 
-# Use the automated setup script (recommended)
+# Option 1: Use the automated setup script (recommended)
 ./setup_uv.sh
 
-# Configure environment
+# Option 2: Manual setup
+uv venv
+source .venv/bin/activate  # macOS/Linux
+# or
+.venv\Scripts\activate     # Windows
+uv pip install -e .
+
+# Configure Dgraph connection
 make config-example
-# Edit config.env with your Dgraph connection and AI API keys
+# Edit config.env with your connection details
 
-# Start Dgraph (local development)
-./start_dgraph.sh
+# Validate OSM data access
+uvx run test_osm_data.py
 
-# Validate system configuration
-make run-validate
-
-# Import news data
-make run-import
-
-# Generate AI embeddings
-make run-embeddings
+# Import OSM data to Dgraph
+uvx run osm_import.py
 
 # Explore with sample queries
-make run-query
-
-# Try vector similarity search
-make run-vector-search query="artificial intelligence"
+uvx run sample_queries.py
 ```
 
 ### Documentation
 
-- **`news/README.md`** - Original HyperNews project documentation
-- **`news/docker-compose.yml`** - Dgraph and Ratel setup configuration
-- **`news/schema.dql`** - Optimized Dgraph schema for news data
+- **`openstreetmap/README.md`** - Detailed usage instructions
+- **`openstreetmap/docker-compose.yml`** - Dgraph setup configuration
 
 ### Features
 
-- Multi-provider AI support (OpenAI, Anthropic, Ollama)
-- Automated news article import with entity extraction
-- AI-powered semantic embeddings generation
-- Vector similarity search for semantic article discovery
-- Comprehensive knowledge graph with articles, topics, organizations, and locations
-- Docker-based development environment with Dgraph and Ratel
-- Modern Python stack with uv package management
+- Geospatial OSM data import into Dgraph using OSMnx
+- Support for various OSM data types (amenities, buildings, parks, etc.)
+- RDF conversion with spatial geometry preservation
+- Interactive spatial and attribute-based queries
+- Docker-based Dgraph setup
 - Data validation and testing tools
 
-### AI Provider Support
+See the `openstreetmap/` directory for complete project details and implementation.
 
-- **OpenAI**: Full support for embeddings and chat completion
-- **Anthropic**: Chat completion support (embeddings via OpenAI)
-- **Ollama**: Local model support for both embeddings and chat
-- **Auto-detection**: Automatically selects available provider
+## 🔧 Common Setup for All Projects
 
-See the `news/` directory for complete project details and implementation.
+Both projects use the same modern tooling and follow similar patterns:
+
+### Package Management
+- **uv** for fast Python package management
+- **pyproject.toml** for modern Python packaging
+- **Makefile** for project management commands
+
+### Dgraph Integration
+- **Docker Compose** for local Dgraph development
+- **Configuration management** with environment variables
+- **Health checks** and automated startup scripts
+
+### Development Tools
+- **Black** for code formatting
+- **Flake8** for linting
+- **Pytest** for testing
+- **Comprehensive logging** and error handling
+
+## 📚 Project Structure
+
+```
+knowledge-graph-datasets/
+├── gtfs/                    # GTFS transit data import project
+├── openstreetmap/           # OpenStreetMap geospatial data import project
+├── news/                    # News article knowledge graph project
+└── README.md                # This file
+```
+
+Each project directory contains a complete, self-contained implementation with its own documentation, configuration, and tooling.

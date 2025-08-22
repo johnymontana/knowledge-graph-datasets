@@ -1,0 +1,78 @@
+.PHONY: help install dev-install clean test format lint run-import run-validate run-query
+
+help: ## Show this help message
+	@echo "GTFS Neo4j Importer - Available Commands:"
+	@echo ""
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-20s\033[0m %s\n", $$1, $$2}'
+
+config: ## Show current Neo4j configuration
+	uv run neo4j_config.py
+
+config-example: ## Create example configuration file
+	@if [ ! -f config.env ]; then \
+		cp config.env.neo4j.example config.env; \
+		echo "✅ Created config.env from Neo4j example"; \
+		echo "📝 Edit config.env with your Neo4j connection details"; \
+	else \
+		echo "⚠️  config.env already exists"; \
+	fi
+
+install: ## Install project dependencies
+	uv sync
+
+dev-install: ## Install project with development dependencies
+	uv sync --extra dev
+
+clean: ## Remove virtual environment
+	rm -rf .venv
+
+test: ## Run tests
+	uv run pytest
+
+format: ## Format code with black
+	uv run black .
+
+lint: ## Lint code with flake8
+	uv run flake8 .
+
+test-connection: ## Test Neo4j connection
+	uv run test_connection_neo4j.py
+
+run-import: ## Run GTFS import script
+	uv run gtfs_import_neo4j.py
+
+run-validate: ## Run GTFS data validation
+	uv run test_gtfs_data.py
+
+run-query: ## Run sample queries
+	uv run sample_queries_neo4j.py
+
+start-neo4j: ## Start Neo4j services
+	./start_neo4j.sh
+
+stop-neo4j: ## Stop Neo4j services
+	docker-compose -f docker-compose-neo4j.yml down
+
+logs: ## View Neo4j logs
+	docker-compose -f docker-compose-neo4j.yml logs -f neo4j
+
+status: ## Check Neo4j status
+	@echo "Checking Neo4j health..."
+	@docker-compose -f docker-compose-neo4j.yml exec neo4j cypher-shell -u neo4j -p password "RETURN 'Neo4j is running' as status" || echo "Neo4j not responding"
+
+schema: ## Apply Neo4j schema
+	@echo "Applying Neo4j schema..."
+	@docker-compose -f docker-compose-neo4j.yml exec -T neo4j cypher-shell -u neo4j -p password < neo4j_schema.cypher
+
+reset-db: ## Clear all data from Neo4j database
+	@echo "⚠️  This will delete ALL data from the Neo4j database!"
+	@read -p "Are you sure? (y/N): " confirm && [ "$$confirm" = "y" ] || exit 1
+	@docker-compose -f docker-compose-neo4j.yml exec -T neo4j cypher-shell -u neo4j -p password "MATCH (n) DETACH DELETE n"
+	@echo "✅ Database cleared"
+
+backup: ## Create a backup of the Neo4j database
+	@echo "Creating Neo4j backup..."
+	@mkdir -p backups
+	@docker-compose -f docker-compose-neo4j.yml exec neo4j neo4j-admin database dump neo4j --to-path=/backups
+	@docker cp gtfs-neo4j:/backups backups/
+	@echo "✅ Backup created in backups/ directory"
