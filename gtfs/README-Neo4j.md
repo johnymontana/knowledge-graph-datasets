@@ -2,29 +2,6 @@
 
 This project imports GTFS (General Transit Feed Specification) data into Neo4j, creating a comprehensive knowledge graph of transit information including agencies, routes, stops, trips, and their relationships.
 
-## What Changed from Dgraph Version
-
-This is a conversion from the original Dgraph implementation to Neo4j. Here are the key changes:
-
-### Files Added/Modified:
-- **New Neo4j files:**
-  - `neo4j_config.py` - Neo4j connection configuration
-  - `gtfs_import_neo4j.py` - Main import script for Neo4j
-  - `sample_queries_neo4j.py` - Sample Cypher queries
-  - `test_connection_neo4j.py` - Neo4j connection test
-  - `neo4j_schema.cypher` - Schema definitions
-  - `docker-compose-neo4j.yml` - Neo4j Docker setup
-  - `start_neo4j.sh` - Neo4j startup script
-  - `Makefile.neo4j` - Neo4j-specific make commands
-  - `config.env.neo4j.example` - Neo4j configuration example
-
-### Key Differences:
-1. **Database Engine**: Neo4j instead of Dgraph
-2. **Query Language**: Cypher instead of DQL
-3. **Schema**: Neo4j constraints/indexes instead of Dgraph schema
-4. **Driver**: `neo4j` Python driver instead of `pydgraph`
-5. **Relationships**: Explicit relationships in Neo4j graph model
-
 ## Prerequisites
 
 - Python 3.8+
@@ -263,15 +240,6 @@ Access the Neo4j Browser at http://localhost:7474 to:
 - Monitor query performance
 - Explore the schema
 
-## Migration from Dgraph Version
-
-If you have an existing Dgraph setup, you can run both systems in parallel:
-
-1. Keep your existing Dgraph files
-2. Use the Neo4j-specific files (with `_neo4j` suffix)
-3. Use `Makefile.neo4j` for Neo4j operations
-4. Use different ports (Neo4j: 7474/7687, Dgraph: 8000/8080)
-
 ## License
 
-This project maintains the same license as the original Dgraph version.
+This project is provided as-is for educational and development purposes.
