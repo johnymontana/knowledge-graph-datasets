@@ -1,5 +1,5 @@
 // Neo4j Schema for GTFS Data
-// This replaces the Dgraph schema with Neo4j constraints and indexes
+// Neo4j constraints and indexes for GTFS transit data
 
 // Create constraints for unique identifiers
 CREATE CONSTRAINT agency_id_unique IF NOT EXISTS FOR (a:Agency) REQUIRE a.agency_id IS UNIQUE;

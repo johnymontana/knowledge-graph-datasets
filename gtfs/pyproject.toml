@@ -22,9 +22,9 @@ dev = [
 ]
 
 [project.scripts]
-gtfs-import = "gtfs_import:main"
+gtfs-import = "gtfs_import_neo4j:main"
 gtfs-validate = "test_gtfs_data:main"
-gtfs-query = "sample_queries:main"
+gtfs-query = "sample_queries_neo4j:main"
 
 [build-system]
 requires = ["hatchling"]

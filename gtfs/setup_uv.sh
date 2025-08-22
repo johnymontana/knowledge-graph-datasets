@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🚀 Setting up GTFS Dgraph Importer with uv"
+echo "🚀 Setting up GTFS Neo4j Importer with uv"
 echo "============================================"
 
 # Check if uv is installed
@@ -58,15 +58,15 @@ echo ""
 echo "🎉 Setup complete! Your environment is ready."
 echo ""
 echo "📋 Next steps:"
-echo "   1. Configure Dgraph connection: make config-example"
-echo "   2. Edit config.env with your Dgraph connection details"
+echo "   1. Configure Neo4j connection: cp config.env.neo4j.example config.env"
+echo "   2. Edit config.env with your Neo4j connection details"
 echo "   3. Validate data: uvx run test_gtfs_data.py"
-echo "   4. Import data: uvx run gtfs_import.py"
-echo "   5. Run queries: uvx run sample_queries.py"
+echo "   4. Import data: uvx run gtfs_import_neo4j.py"
+echo "   5. Run queries: uvx run sample_queries_neo4j.py"
 echo ""
 echo "💡 Useful commands:"
 echo "   • make help          - Show all available commands"
-echo "   • make config        - Show current Dgraph configuration"
+echo "   • make config-neo4j  - Show current Neo4j configuration"
 echo "   • make config-example - Create example configuration file"
 echo "   • uvx run <script>   - Run scripts without activation"
 echo "   • uv run python <script> - Run scripts with activated environment"
