@@ -129,7 +129,7 @@ class FoursquareQueryRunner:
             WITH point({latitude: 47.6062, longitude: -122.3321}) as downtown_seattle
             MATCH (p:Place)
             WHERE p.location IS NOT NULL
-            WITH p, distance(p.location, downtown_seattle) as distance_meters
+            WITH p, point.distance(p.location, downtown_seattle) as distance_meters
             WHERE distance_meters <= 1000
             RETURN p.name, p.locality, round(distance_meters) as distance_m
             ORDER BY distance_meters
@@ -155,7 +155,7 @@ class FoursquareQueryRunner:
             """
             MATCH (p:Place)-[:WITHIN_500M]->(ts:TransitStop)
             WHERE p.location IS NOT NULL AND ts.location IS NOT NULL
-            WITH p, ts, distance(p.location, ts.location) as distance_meters
+            WITH p, ts, point.distance(p.location, ts.location) as distance_meters
             ORDER BY p.fsq_place_id, distance_meters
             WITH p, collect({stop: ts, distance: distance_meters})[0] as closest_stop
             RETURN p.name, p.locality, 

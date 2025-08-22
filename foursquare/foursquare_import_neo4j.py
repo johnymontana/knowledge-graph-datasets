@@ -190,14 +190,7 @@ class FoursquareImporter:
                 else:
                     cleaned_row[key] = str(value).strip()
             
-            # Create Point geometry for spatial queries
-            if 'stop_lat' in cleaned_row and 'stop_lon' in cleaned_row:
-                cleaned_row['location'] = {
-                    'x': cleaned_row['stop_lon'],
-                    'y': cleaned_row['stop_lat'],
-                    'srid': 4326
-                }
-            
+            # Don't create location property here - let Cypher handle it
             neo4j_data.append(cleaned_row)
         
         return neo4j_data
@@ -246,14 +239,7 @@ class FoursquareImporter:
                 else:
                     cleaned_row[key] = str(value).strip()
             
-            # Create Point geometry for spatial queries
-            if 'latitude' in cleaned_row and 'longitude' in cleaned_row:
-                cleaned_row['location'] = {
-                    'x': cleaned_row['longitude'],
-                    'y': cleaned_row['latitude'],
-                    'srid': 4326
-                }
-            
+            # Don't create location property here - let Cypher handle it
             neo4j_data.append(cleaned_row)
         
         return neo4j_data
@@ -419,7 +405,7 @@ class FoursquareImporter:
                 result = session.run("""
                     MATCH (p:Place), (ts:TransitStop)
                     WHERE p.location IS NOT NULL AND ts.location IS NOT NULL
-                    AND distance(p.location, ts.location) <= 500
+                    AND point.distance(p.location, ts.location) <= 500
                     MERGE (p)-[:WITHIN_500M]->(ts)
                     RETURN count(*) as relationships_created
                 """)

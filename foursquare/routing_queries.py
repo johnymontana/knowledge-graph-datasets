@@ -166,7 +166,7 @@ class RoutingAnalysis:
             MATCH (home_stop:TransitStop)
             WHERE home_stop.location IS NOT NULL
             WITH home_location, work_location, home_stop,
-                 distance(home_location, home_stop.location) as home_walk_distance
+                 point.distance(home_location, home_stop.location) as home_walk_distance
             ORDER BY home_walk_distance
             LIMIT 3
             
@@ -174,9 +174,9 @@ class RoutingAnalysis:
             WITH home_location, work_location, home_stop, home_walk_distance
             MATCH (work_stop:TransitStop)
             WHERE work_stop.location IS NOT NULL 
-                  AND distance(work_location, work_stop.location) <= 800
+                  AND point.distance(work_location, work_stop.location) <= 800
             WITH home_stop, work_stop, home_walk_distance,
-                 distance(work_location, work_stop.location) as work_walk_distance
+                 point.distance(work_location, work_stop.location) as work_walk_distance
             
             // Find path between transit stops via places
             MATCH path = shortestPath((home_stop)-[:WITHIN_500M*1..10]-(work_stop))
@@ -300,7 +300,7 @@ class RoutingAnalysis:
             MATCH (nearby_stop:TransitStop)
             WHERE nearby_stop.location IS NOT NULL
             WITH start_point, nearby_stop, 
-                 distance(start_point, nearby_stop.location) as walk_to_stop
+                 point.distance(start_point, nearby_stop.location) as walk_to_stop
             WHERE walk_to_stop <= 800  // Within walking distance
             ORDER BY walk_to_stop
             LIMIT 5
@@ -311,7 +311,7 @@ class RoutingAnalysis:
             WHERE c.label CONTAINS "Restaurant" OR c.label CONTAINS "Shop"
             
             WITH destination, c, nearby_stop, walk_to_stop, 
-                 distance(nearby_stop.location, destination.location) as walk_from_stop
+                 point.distance(nearby_stop.location, destination.location) as walk_from_stop
             
             RETURN destination.name, destination.locality, c.label,
                    nearby_stop.stop_name,
@@ -329,9 +329,9 @@ class RoutingAnalysis:
             """
             // Find transit corridors (stops connected via places)
             MATCH (ts1:TransitStop)-[:WITHIN_500M]-(bridge:Place)-[:WITHIN_500M]-(ts2:TransitStop)
-            WHERE ts1 <> ts2 AND distance(ts1.location, ts2.location) <= 2000
+            WHERE ts1 <> ts2 AND point.distance(ts1.location, ts2.location) <= 2000
             
-            WITH ts1, ts2, bridge, distance(ts1.location, ts2.location) as corridor_distance
+            WITH ts1, ts2, bridge, point.distance(ts1.location, ts2.location) as corridor_distance
             ORDER BY corridor_distance
             
             // Find other places along this corridor
@@ -339,9 +339,9 @@ class RoutingAnalysis:
             WHERE corridor_place.location IS NOT NULL
             WITH ts1, ts2, bridge, corridor_distance,
                  corridor_place,
-                 distance(ts1.location, corridor_place.location) + 
-                 distance(corridor_place.location, ts2.location) as route_distance,
-                 distance(ts1.location, ts2.location) as direct_distance
+                             point.distance(ts1.location, corridor_place.location) +
+            point.distance(corridor_place.location, ts2.location) as route_distance,
+            point.distance(ts1.location, ts2.location) as direct_distance
             WHERE abs(route_distance - direct_distance) <= 200  // Places roughly on the line
             
             MATCH (corridor_place)-[:BELONGS_TO_CATEGORY]->(c:Category)
