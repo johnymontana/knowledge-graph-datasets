@@ -1,29 +1,31 @@
 # News Knowledge Graph
 
-A comprehensive knowledge graph system for news articles using Dgraph, AI embeddings, and vector similarity search. This project converts the original HyperNews project to follow modern Python development practices with uv package management.
+A comprehensive knowledge graph system for news articles using Neo4j, AI embeddings, and vector similarity search. This project converts the original HyperNews project to follow modern Python development practices with uv package management.
 
 ## 🚀 Features
 
-- **Knowledge Graph Storage**: Store news articles, entities, and relationships in Dgraph
+- **Knowledge Graph Storage**: Store news articles, entities, and relationships in Neo4j
 - **AI-Powered Embeddings**: Generate semantic embeddings using OpenAI, Anthropic, or local Ollama models
-- **Vector Similarity Search**: Find similar articles using semantic similarity
+- **Vector Similarity Search**: Find similar articles using semantic similarity with Neo4j vector indexes
 - **Multi-Provider AI Support**: Works with OpenAI, Anthropic, or local Ollama models
 - **Modern Python Stack**: Uses uv for dependency management and virtual environments
 - **Comprehensive Tooling**: Import, validate, query, and search news data
 - **Docker Support**: Easy local development with Docker Compose
+- **Geospatial Queries**: Support for location-based article queries
+- **Temporal Analysis**: Time-based article analysis and filtering
 
 ## 🏗️ Architecture
 
 ```
 ┌─────────────────┐    ┌─────────────────┐    ┌─────────────────┐
-│   JSON Files    │    │  News Importer  │    │   Dgraph DB     │
+│   JSON Files    │    │  News Importer  │    │    Neo4j DB     │
 │   (NYT Data)    │───▶│  + AI Provider  │───▶│  + Vector Index │
 └─────────────────┘    └─────────────────┘    └─────────────────┘
                                 │                       │
                                 ▼                       ▼
                        ┌─────────────────┐    ┌─────────────────┐
                        │  Embeddings     │    │  Vector Search  │
-                       │  Generator      │    │  + Query API    │
+                       │  Generator      │    │  + Cypher API   │
                        └─────────────────┘    └─────────────────┘
 ```
 
@@ -57,15 +59,15 @@ make config-example
 nano config.env
 ```
 
-### 3. Start Dgraph (Local Development)
+### 3. Start Neo4j (Local Development)
 
 ```bash
-# Start Dgraph services
-chmod +x start_dgraph.sh
-./start_dgraph.sh
+# Start Neo4j services
+chmod +x start_neo4j.sh
+./start_neo4j.sh
 
-# Or use make
-make start-dgraph
+# Or use Docker Compose directly
+docker-compose up -d
 ```
 
 ## ⚙️ Configuration
@@ -75,8 +77,11 @@ make start-dgraph
 Create a `config.env` file with the following variables:
 
 ```bash
-# Dgraph Connection
-DGRAPH_CONNECTION_STRING=dgraph://localhost:8080
+# Neo4j Connection
+NEO4J_URI=bolt://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
+NEO4J_DATABASE=neo4j
 
 # AI Provider (choose one)
 OPENAI_API_KEY=your_openai_api_key_here
@@ -99,8 +104,9 @@ OLLAMA_MODEL=nomic-embed-text
 
 ### Connection String Formats
 
-- **Local Dgraph**: `@dgraph://localhost:8080`
-- **Hypermode**: `dgraph://host:port?sslmode=verify-ca&bearertoken=token`
+- **Local Neo4j**: `bolt://localhost:7687`
+- **Neo4j Aura**: `neo4j://your-instance.databases.neo4j.io`
+- **Neo4j Enterprise**: `bolt://host:7687` or `neo4j://host:7687`
 
 ## 📊 Data Import
 
@@ -119,7 +125,7 @@ Place your NYT JSON files in the `data/articles/` directory. The system supports
 make run-import
 
 # Or with custom settings
-uvx run news_import.py --data-dir data/articles --batch-size 50
+uv run news_import_neo4j.py --data-dir data/articles --limit 1000
 ```
 
 ### 3. Generate Embeddings
@@ -129,10 +135,10 @@ uvx run news_import.py --data-dir data/articles --batch-size 50
 make run-embeddings
 
 # Generate embeddings for specific topics
-uvx run news_embeddings.py --topic "technology" --limit 1000
+uv run news_embeddings_neo4j.py --topic "technology" --limit 1000
 
 # Or with custom batch size
-uvx run news_embeddings.py --batch-size 25
+uv run news_embeddings_neo4j.py --batch-size 25
 ```
 
 ## 🔍 Querying and Search
@@ -144,8 +150,9 @@ uvx run news_embeddings.py --batch-size 25
 make run-query
 
 # Run specific query types
-uvx run sample_queries.py --basic
-uvx run sample_queries.py --vector-search
+uv run sample_queries_neo4j.py --basic
+uv run sample_queries_neo4j.py --vector-search
+uv run sample_queries_neo4j.py --geospatial
 ```
 
 ### 2. Vector Similarity Search
@@ -155,47 +162,44 @@ uvx run sample_queries.py --vector-search
 make run-vector-search query="artificial intelligence and machine learning"
 
 # Or directly
-uvx run vector_search.py "climate change and global warming" --limit 5
+uv run vector_search_neo4j.py "climate change and global warming" --limit 5
 
 # Search by topic
-uvx run vector_search.py "politics" --topic
+uv run vector_search_neo4j.py "politics" --topic
 ```
 
-### 3. Custom Queries
+### 3. Custom Cypher Queries
 
-The system supports full DQL queries. Examples:
+The system supports full Cypher queries. Examples:
 
-```dql
-# Basic article query
-{
-  articles(func: type(Article), first: 10) {
-    uid
-    Article.title
-    Article.abstract
-    Article.published
-  }
-}
+```cypher
+// Basic article query
+MATCH (a:Article) 
+RETURN a.uri, a.title, a.abstract, a.published 
+LIMIT 10
 
-# Articles with topics
-{
-  articles(func: type(Article), first: 5) @filter(has(Article.topic)) {
-    uid
-    Article.title
-    Article.topic {
-      Topic.name
-    }
-  }
-}
+// Articles with topics
+MATCH (a:Article)-[:HAS_TOPIC]->(t:Topic)
+RETURN a.title, collect(t.name) as topics 
+LIMIT 5
 
-# Vector similarity search
-query vector_search($embedding: string, $limit: int) {
-  articles(func: similar_to(Article.embedding, $limit, $embedding)) {
-    uid
-    Article.title
-    Article.abstract
-    score
-  }
-}
+// Vector similarity search
+CALL db.index.vector.queryNodes('article_embeddings', 10, $queryVector)
+YIELD node, score
+RETURN node.title, node.abstract, score
+ORDER BY score DESC
+```
+
+### 4. Geospatial Queries
+
+```cypher
+// Articles near a specific location
+MATCH (a:Article)-[:LOCATED_IN]->(g:Geo)
+WHERE g.location IS NOT NULL
+WITH a, g, distance(g.location, point({latitude: 40.7128, longitude: -74.0060})) as dist
+WHERE dist < 100000  // 100km in meters
+RETURN a.title, g.name, round(dist/1000) as distance_km
+ORDER BY dist
 ```
 
 ## 🧪 Testing and Validation
@@ -207,9 +211,9 @@ query vector_search($embedding: string, $limit: int) {
 make run-validate
 
 # Test specific components
-uvx run test_news_data.py --config-only
-uvx run test_news_data.py --ai-only
-uvx run test_news_data.py --data-only
+uv run test_news_data_neo4j.py --config-only
+uv run test_news_data_neo4j.py --ai-only
+uv run test_news_data_neo4j.py --data-only
 ```
 
 ### 2. Quick System Test
@@ -231,7 +235,7 @@ make demo
 docker-compose up -d
 
 # View logs
-docker-compose logs -f dgraph
+docker-compose logs -f neo4j
 
 # Check status
 make status
@@ -244,14 +248,13 @@ make status
 docker-compose down
 
 # Or use make
-make stop-dgraph
+make stop-neo4j
 ```
 
 ### Service URLs
 
-- **Dgraph Alpha**: http://localhost:8080
-- **Dgraph GraphQL**: http://localhost:8000
-- **Ratel Admin UI**: http://localhost:8001
+- **Neo4j Browser**: http://localhost:7474
+- **Neo4j Bolt Protocol**: bolt://localhost:7687
 
 ## 🔧 Development
 
@@ -259,21 +262,21 @@ make stop-dgraph
 
 ```
 news/
-├── pyproject.toml          # Project configuration and dependencies
-├── config.env.example      # Example environment configuration
-├── dgraph_config.py        # Dgraph connection management
-├── ai_provider.py          # AI provider abstraction layer
-├── news_import.py          # Main import script
-├── news_embeddings.py      # Embeddings generation
-├── vector_search.py        # Vector similarity search
-├── sample_queries.py       # Example queries
-├── test_news_data.py       # Validation and testing
-├── schema.dql              # Dgraph schema definition
-├── docker-compose.yml      # Docker services configuration
-├── setup_uv.sh            # Setup script
-├── start_dgraph.sh        # Dgraph startup script
-├── Makefile               # Development commands
-└── README_NEWS_IMPORT.md  # This file
+├── pyproject.toml              # Project configuration and dependencies
+├── config.env.example          # Example environment configuration
+├── neo4j_config.py             # Neo4j connection management
+├── ai_provider.py              # AI provider abstraction layer
+├── news_import_neo4j.py        # Main import script for Neo4j
+├── news_embeddings_neo4j.py    # Embeddings generation for Neo4j
+├── vector_search_neo4j.py      # Vector similarity search for Neo4j
+├── sample_queries_neo4j.py     # Example Cypher queries
+├── test_news_data_neo4j.py     # Validation and testing for Neo4j
+├── schema.cypher               # Neo4j schema definition (Cypher)
+├── docker-compose.yml          # Docker services configuration
+├── setup_uv.sh                # Setup script
+├── start_neo4j.sh             # Neo4j startup script
+├── Makefile                    # Development commands
+└── README.md                   # This file
 ```
 
 ### Available Commands
@@ -290,14 +293,14 @@ make format               # Format code with black
 make lint                 # Lint code with flake8
 
 # Data operations
-make run-import           # Import news data
-make run-embeddings       # Generate embeddings
-make run-query            # Run sample queries
+make run-import           # Import news data to Neo4j
+make run-embeddings       # Generate embeddings in Neo4j
+make run-query            # Run sample Cypher queries
 make run-validate         # Validate system
 
 # Docker operations
-make start-dgraph         # Start Dgraph services
-make stop-dgraph          # Stop Dgraph services
+make start-neo4j          # Start Neo4j services
+make stop-neo4j           # Stop Neo4j services
 make logs                 # View service logs
 make status               # Check service status
 
@@ -309,65 +312,62 @@ make quick-test           # Quick system test
 make demo                 # Run system demo
 ```
 
-### Adding New AI Providers
+### Graph Schema
 
-The system uses a provider abstraction pattern. To add a new AI provider:
+The Neo4j graph uses the following structure:
 
-1. Create a new class implementing the `AIProvider` interface
-2. Add the provider to the `get_ai_provider()` factory function
-3. Update the configuration handling
+**Node Labels:**
+- `Article`: News articles with properties like title, abstract, published date
+- `Topic`: Article topics/themes
+- `Organization`: Organizations mentioned in articles
+- `Person`: People mentioned in articles
+- `Author`: Article authors
+- `Geo`: Geographic locations with optional point geometry
+- `Image`: Article images
 
-Example:
-
-```python
-class NewAIProvider(AIProvider):
-    def __init__(self, api_key: str):
-        self.api_key = api_key
-    
-    def generate_embedding(self, text: str) -> List[float]:
-        # Implementation here
-        pass
-    
-    def generate_embeddings_batch(self, texts: List[str]) -> List[List[float]]:
-        # Implementation here
-        pass
-    
-    def chat_completion(self, messages: List[Dict[str, str]], model: Optional[str] = None) -> str:
-        # Implementation here
-        pass
-```
+**Relationships:**
+- `HAS_TOPIC`: Article to Topic
+- `MENTIONS_ORGANIZATION`: Article to Organization
+- `MENTIONS_PERSON`: Article to Person
+- `WRITTEN_BY`: Article to Author
+- `LOCATED_IN`: Article to Geo
+- `HAS_IMAGE`: Article to Image
 
 ## 📈 Performance Tuning
 
-### Batch Sizes
-
-- **Import Batch Size**: Controls how many N-Quads are sent to Dgraph at once
-- **Embedding Batch Size**: Controls how many texts are processed for embeddings simultaneously
-
-### Memory and Limits
+### Neo4j Configuration
 
 The Docker Compose configuration includes optimized settings:
 
 ```yaml
-command: dgraph start --alpha --limit "mutations-nquad=1000000; query-edge=1000000; query-var=1000000" --memory_mb 2048
+environment:
+  - NEO4J_dbms_memory_heap_initial__size=1G
+  - NEO4J_dbms_memory_heap_max__size=2G
+  - NEO4J_dbms_memory_pagecache_size=1G
 ```
 
 ### Indexing
 
 The schema includes optimized indexes for:
 
-- **Full-text search**: `@index(fulltext)`
-- **Vector similarity**: `@index(hnsw(metric:"euclidean"))`
-- **Geospatial queries**: `@index(geo)`
-- **Date queries**: `@index(year, month, day, hour)`
+- **Fulltext search**: `CREATE FULLTEXT INDEX article_text FOR (a:Article) ON EACH [a.title, a.abstract]`
+- **Vector similarity**: `CREATE VECTOR INDEX article_embeddings FOR (a:Article) ON (a.embedding)`
+- **Property indexes**: For efficient lookups on common properties
+- **Constraints**: To ensure data integrity
+
+### Vector Search Performance
+
+- Use appropriate vector dimensions (1536 for OpenAI embeddings)
+- Choose the right similarity function (cosine, euclidean, or dot product)
+- Consider the trade-off between search quality and performance
 
 ## 🚨 Troubleshooting
 
 ### Common Issues
 
-1. **Dgraph Connection Failed**
-   - Check if Dgraph is running: `make status`
-   - Verify connection string in `config.env`
+1. **Neo4j Connection Failed**
+   - Check if Neo4j is running: `make status`
+   - Verify connection settings in `config.env`
    - Check Docker logs: `make logs`
 
 2. **AI Provider Errors**
@@ -378,12 +378,12 @@ The schema includes optimized indexes for:
 3. **Import Failures**
    - Check JSON file format
    - Verify data directory path
-   - Check Dgraph schema is loaded
+   - Check Neo4j is accessible and has sufficient memory
 
-4. **Embedding Generation Issues**
-   - Verify AI provider configuration
-   - Check text length requirements
-   - Monitor API usage and limits
+4. **Vector Search Issues**
+   - Ensure vector index is created: `SHOW INDEXES`
+   - Verify articles have embeddings: `MATCH (a:Article) WHERE a.embedding IS NOT NULL RETURN count(a)`
+   - Check vector dimensions match your embedding model
 
 ### Debug Mode
 
@@ -396,11 +396,11 @@ LOG_LEVEL=DEBUG
 ### Health Checks
 
 ```bash
-# Check Dgraph health
-curl http://localhost:8080/health
+# Check Neo4j health
+curl http://localhost:7474
 
-# Check Ratel
-curl http://localhost:8001
+# Test connection with Cypher
+echo "RETURN 1 as test" | cypher-shell -u neo4j -p password
 
 # Test configuration
 make config
@@ -408,36 +408,36 @@ make config
 
 ## 🔗 API Reference
 
-### NewsImporter
+### NewsImporterNeo4j
 
-Main class for importing news articles.
+Main class for importing news articles to Neo4j.
 
 ```python
-from news_import import NewsImporter
+from news_import_neo4j import NewsImporterNeo4j
 
-importer = NewsImporter("config.env")
-importer.import_articles("data/articles", "output.rdf")
+importer = NewsImporterNeo4j("config.env")
+importer.import_articles("data/articles", limit=1000)
 ```
 
-### NewsEmbeddingsGenerator
+### NewsEmbeddingsGeneratorNeo4j
 
-Class for generating and updating embeddings.
+Class for generating and updating embeddings in Neo4j.
 
 ```python
-from news_embeddings import NewsEmbeddingsGenerator
+from news_embeddings_neo4j import NewsEmbeddingsGeneratorNeo4j
 
-generator = NewsEmbeddingsGenerator("config.env")
+generator = NewsEmbeddingsGeneratorNeo4j("config.env")
 generator.generate_embeddings_for_all(limit=1000)
 ```
 
-### NewsVectorSearch
+### NewsVectorSearchNeo4j
 
-Class for vector similarity search.
+Class for vector similarity search in Neo4j.
 
 ```python
-from vector_search import NewsVectorSearch
+from vector_search_neo4j import NewsVectorSearchNeo4j
 
-searcher = NewsVectorSearch("config.env")
+searcher = NewsVectorSearchNeo4j("config.env")
 results = searcher.search("artificial intelligence", limit=10)
 ```
 
@@ -454,8 +454,9 @@ embedding = provider.generate_embedding("text")
 
 ## 📚 Additional Resources
 
-- [Dgraph Documentation](https://dgraph.io/docs/)
-- [DQL Query Language](https://dgraph.io/docs/query-language/)
+- [Neo4j Documentation](https://neo4j.com/docs/)
+- [Cypher Query Language](https://neo4j.com/docs/cypher-manual/current/)
+- [Neo4j Vector Search](https://neo4j.com/docs/cypher-manual/current/indexes-for-vector-search/)
 - [OpenAI API Documentation](https://platform.openai.com/docs)
 - [Anthropic API Documentation](https://docs.anthropic.com/)
 - [Ollama Documentation](https://ollama.ai/docs)
@@ -483,4 +484,4 @@ For issues and questions:
 
 ---
 
-**Happy knowledge graphing! 🚀📰**
+**Happy knowledge graphing with Neo4j! 🚀📰**
