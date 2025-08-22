@@ -1,10 +1,10 @@
-# GTFS to Dgraph Knowledge Graph Project
+# GTFS to Neo4j Knowledge Graph Project
 
-This project provides a complete solution for importing GTFS (General Transit Feed Specification) data into Dgraph, creating a rich knowledge graph of transit information that can be queried and analyzed.
+This project provides a complete solution for importing GTFS (General Transit Feed Specification) data into Neo4j, creating a rich knowledge graph of transit information that can be queried and analyzed.
 
 ## 🎯 Project Goals
 
-- **Data Integration**: Import comprehensive transit data from GTFS format into Dgraph
+- **Data Integration**: Import comprehensive transit data from GTFS format into Neo4j
 - **Knowledge Graph**: Create meaningful relationships between transit entities
 - **Query Capability**: Enable complex queries across the transit network
 - **Scalability**: Handle large GTFS datasets efficiently
@@ -13,11 +13,11 @@ This project provides a complete solution for importing GTFS (General Transit Fe
 ## 🏗️ Architecture Overview
 
 ```
-GTFS Data Files → Python Import Script → Dgraph Database → Query Interface
+GTFS Data Files → Python Import Script → Neo4j Database → Query Interface
      ↓                    ↓                    ↓              ↓
-  CSV Format        Data Processing      Graph Schema    GraphQL/DQL
+  CSV Format        Data Processing      Graph Schema    Cypher
   (agency.txt,      (Validation,        (Nodes &        (Interactive
-   routes.txt,       Type Conversion,    Edges)          Queries)
+   routes.txt,       Type Conversion,    Relationships)  Queries)
    stops.txt, etc.)  Batching)
 ```
 
@@ -39,12 +39,12 @@ knowledge-graph-datasets/
 │   │   ├── transfers.txt          # Transfer information
 │   │   ├── shapes.txt             # Route shapes
 │   │   └── feed_info.txt          # Feed metadata
-│   ├── gtfs_import.py             # Main import script
+│   ├── gtfs_import_neo4j.py       # Main import script
 │   ├── test_gtfs_data.py          # Data validation script
-│   ├── sample_queries.py          # Query examples
-│   ├── dgraph_config.py           # Configuration management
-│   ├── docker-compose.yml         # Dgraph setup
-│   ├── start_dgraph.sh            # Startup script
+│   ├── sample_queries_neo4j.py    # Query examples
+│   ├── neo4j_config.py            # Configuration management
+│   ├── docker-compose-neo4j.yml   # Neo4j setup
+│   ├── start_neo4j.sh             # Startup script
 │   ├── setup_uv.sh                # Automated setup script
 │   ├── Makefile                   # Project management commands
 │   ├── pyproject.toml             # Project configuration
@@ -70,19 +70,19 @@ source .venv/bin/activate  # macOS/Linux
 uv pip install -e .
 ```
 
-### 2. Configure Dgraph Connection
+### 2. Configure Neo4j Connection
 ```bash
 # Create configuration file
-make config-example
+cp config.env.neo4j.example config.env
 
 # Edit configuration with your connection details
 nano config.env
 ```
 
-### 3. Start Dgraph (Local)
+### 3. Start Neo4j (Local)
 ```bash
 # For local development
-./start_dgraph.sh
+./start_neo4j.sh
 ```
 
 ### 4. Validate Data
@@ -97,28 +97,28 @@ uv run python test_gtfs_data.py
 ### 5. Import Data
 ```bash
 # Basic import (will resume if interrupted)
-uvx run gtfs_import.py
+uvx run gtfs_import_neo4j.py
 
 # Import with custom batch size
-uvx run gtfs_import.py --batch-size 5000
+uvx run gtfs_import_neo4j.py --batch-size 5000
 
 # Import with custom data directory
-uvx run gtfs_import.py --data-dir /path/to/gtfs/data
+uvx run gtfs_import_neo4j.py --data-dir /path/to/gtfs/data
 
 # Or using uv with activated virtual environment
-uv run python gtfs_import.py --batch-size 5000
+uv run python gtfs_import_neo4j.py --batch-size 5000
 ```
 
 **Resume & Progress Management:**
 ```bash
 # Check current import progress
-uvx run gtfs_import.py --show-progress
+uvx run gtfs_import_neo4j.py --show-progress
 
 # Reset progress to start fresh
-uvx run gtfs_import.py --reset-progress
+uvx run gtfs_import_neo4j.py --reset-progress
 
 # Remove progress file completely
-uvx run gtfs_import.py --clear-progress
+uvx run gtfs_import_neo4j.py --clear-progress
 ```
 
 ### 6. Resume Interrupted Imports
@@ -126,16 +126,16 @@ The import script now includes **automatic resume functionality** that allows yo
 
 ```bash
 # Resume from where you left off (automatic)
-uvx run gtfs_import.py
+uvx run gtfs_import_neo4j.py
 
 # Check current import progress
-uvx run gtfs_import.py --show-progress
+uvx run gtfs_import_neo4j.py --show-progress
 
 # Reset progress to start fresh (if needed)
-uvx run gtfs_import.py --reset-progress
+uvx run gtfs_import_neo4j.py --reset-progress
 
 # Remove progress file completely
-uvx run gtfs_import.py --clear-progress
+uvx run gtfs_import_neo4j.py --clear-progress
 ```
 
 **Resume Features:**
@@ -148,15 +148,15 @@ uvx run gtfs_import.py --clear-progress
 ### 7. Explore Data
 ```bash
 # Using uvx (recommended)
-uvx run sample_queries.py
+uvx run sample_queries_neo4j.py
 
 # Or using uv with activated virtual environment
-uv run python sample_queries.py
+uv run python sample_queries_neo4j.py
 ```
 
 ## 🔧 Core Components
 
-### GTFS Import Script (`gtfs_import.py`)
+### GTFS Import Script (`gtfs_import_neo4j.py`)
 - **Purpose**: Main data import engine
 - **Features**:
   - Automatic schema creation
@@ -176,7 +176,7 @@ uv run python sample_queries.py
   - Geographic bounds analysis
   - Route type categorization
 
-### Query Examples (`sample_queries.py`)
+### Query Examples (`sample_queries_neo4j.py`)
 - **Purpose**: Demonstrate data querying capabilities
 - **Features**:
   - Agency and route queries
@@ -184,19 +184,19 @@ uv run python sample_queries.py
   - Trip and schedule queries
   - Transfer and fare queries
 
-### Configuration Management (`dgraph_config.py`)
-- **Purpose**: Dgraph connection and configuration
+### Configuration Management (`neo4j_config.py`)
+- **Purpose**: Neo4j connection and configuration
 - **Features**:
   - Connection string parsing
-  - SSL and authentication support
+  - Authentication and encryption support
   - Environment variable management
   - Configuration validation
 
-### Dgraph Setup (`docker-compose.yml`)
-- **Purpose**: Containerized Dgraph environment
+### Neo4j Setup (`docker-compose-neo4j.yml`)
+- **Purpose**: Containerized Neo4j environment
 - **Features**:
-  - Standalone Dgraph instance
-  - Ratel UI for interactive queries
+  - Standalone Neo4j instance
+  - Neo4j Browser for interactive queries
   - Persistent data storage
   - Health monitoring
 
@@ -279,7 +279,7 @@ uvx run gtfs_import.py
 #### **Show Progress**
 ```bash
 # Display current import status
-uvx run gtfs_import.py --show-progress
+uvx run gtfs_import_neo4j.py --show-progress
 
 # Output example:
 # Agencies: ✅ COMPLETED (1/1)
@@ -291,7 +291,7 @@ uvx run gtfs_import.py --show-progress
 #### **Reset Progress**
 ```bash
 # Reset all progress to start fresh
-uvx run gtfs_import.py --reset-progress
+uvx run gtfs_import_neo4j.py --reset-progress
 
 # Use when you want to:
 # - Start a completely new import
@@ -302,7 +302,7 @@ uvx run gtfs_import.py --reset-progress
 #### **Clear Progress File**
 ```bash
 # Remove the progress file completely
-uvx run gtfs_import.py --clear-progress
+uvx run gtfs_import_neo4j.py --clear-progress
 
 # Use when you want to:
 # - Remove all progress tracking
@@ -342,7 +342,7 @@ The system handles various error scenarios:
 
 #### **Transaction Errors**
 ```bash
-# If a batch fails due to Dgraph issues
+# If a batch fails due to Neo4j issues
 Error in transaction for batch 15/333: <error details>
 # Progress is saved up to batch 14
 # Resume will start from batch 15
@@ -357,7 +357,7 @@ Error in transaction for batch 15/333: <error details>
 
 #### **Connection Issues**
 ```bash
-# If Dgraph connection is lost
+# If Neo4j connection is lost
 # Progress is saved before attempting connection
 # Resume continues from last successful batch
 ```
@@ -367,13 +367,13 @@ Error in transaction for batch 15/333: <error details>
 #### **For Large Datasets**
 ```bash
 # Use appropriate batch sizes
-uvx run gtfs_import.py --batch-size 5000
+uvx run gtfs_import_neo4j.py --batch-size 5000
 
 # Monitor progress regularly
-uvx run gtfs_import.py --show-progress
+uvx run gtfs_import_neo4j.py --show-progress
 
 # Resume after interruptions
-uvx run gtfs_import.py
+uvx run gtfs_import_neo4j.py
 ```
 
 #### **For Production Environments**
@@ -395,18 +395,18 @@ uvx run gtfs_import.py
 #### **Progress File Issues**
 ```bash
 # If progress file becomes corrupted
-uvx run gtfs_import.py --clear-progress
+uvx run gtfs_import_neo4j.py --clear-progress
 
 # If you want to force re-import
-uvx run gtfs_import.py --reset-progress
+uvx run gtfs_import_neo4j.py --reset-progress
 ```
 
 #### **Import Stuck**
 ```bash
 # Check current progress
-uvx run gtfs_import.py --show-progress
+uvx run gtfs_import_neo4j.py --show-progress
 
-# Verify Dgraph connection
+# Verify Neo4j connection
 # Check system resources
 # Resume import
 ```
@@ -441,14 +441,14 @@ source .venv/bin/activate  # macOS/Linux
 uv pip install -e .
 
 # Run scripts with uvx (no activation needed)
-uvx run gtfs_import.py
+uvx run gtfs_import_neo4j.py
 uvx run test_gtfs_data.py
-uvx run sample_queries.py
+uvx run sample_queries_neo4j.py
 
 # Run scripts with uv (requires activation)
-uv run python gtfs_import.py
+uv run python gtfs_import_neo4j.py
 uv run python test_gtfs_data.py
-uv run python sample_queries.py
+uv run python sample_queries_neo4j.py
 
 # Add development dependencies
 uv add --dev pytest black flake8
@@ -472,13 +472,13 @@ make help
 make install
 
 # Run scripts
-make run-import
+make run-import-neo4j
 make run-validate
-make run-query
+make run-query-neo4j
 
-# Start/stop Dgraph
-make start-dgraph
-make stop-dgraph
+# Start/stop Neo4j
+make start-neo4j
+make stop-neo4j
 
 # Configuration management
 make config
@@ -487,11 +487,11 @@ make config-example
 
 ## ⚙️ Configuration
 
-The project uses a configuration file to manage Dgraph connection settings. Create a `config.env` file in the project directory:
+The project uses a configuration file to manage Neo4j connection settings. Create a `config.env` file in the project directory:
 
 ```bash
 # Copy the example configuration
-cp config.env.example config.env
+cp config.env.neo4j.example config.env
 
 # Edit the configuration file
 nano config.env
@@ -500,8 +500,10 @@ nano config.env
 ### Configuration Options
 
 ```bash
-# Dgraph connection string
-DGRAPH_CONNECTION_STRING=dgraph://host:port?sslmode=verify-ca&bearertoken=token
+# Neo4j connection settings
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
 
 # Import settings
 BATCH_SIZE=1000
@@ -513,29 +515,33 @@ LOG_LEVEL=INFO
 
 ### Connection String Format
 
-The Dgraph connection string follows this format:
+The Neo4j connection uses standard Neo4j URI format:
 ```
-dgraph://host:port?sslmode=mode&bearertoken=token
+neo4j://host:port
 ```
 
-- **host**: Dgraph server hostname or IP
-- **port**: Dgraph server port (default: 443 for HTTPS, 8080 for HTTP)
-- **sslmode**: SSL mode (verify-ca, require, allow, prefer, disable)
-- **bearertoken**: Authentication token for secure connections
+- **host**: Neo4j server hostname or IP
+- **port**: Neo4j server port (default: 7687 for Bolt protocol)
+- **username**: Neo4j database username
+- **password**: Neo4j database password
 
 ### Example Connections
 
 ```bash
-# HyperMode cloud instance
-DGRAPH_CONNECTION_STRING=dgraph://gtfs-ai-hack-and-quack.hypermode.host:443?sslmode=verify-ca&bearertoken=y2l1LU4CySMacB
+# Neo4j Aura cloud instance
+NEO4J_URI=neo4j+s://your-instance.databases.neo4j.io
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=your-password
 
 # Local development
-DGRAPH_CONNECTION_STRING=dgraph://localhost:8080
+NEO4J_URI=neo4j://localhost:7687
+NEO4J_USERNAME=neo4j
+NEO4J_PASSWORD=password
 ```
 
 ## 📊 Data Model
 
-The Dgraph schema creates a comprehensive transit knowledge graph with rich relationships between entities:
+The Neo4j schema creates a comprehensive transit knowledge graph with rich relationships between entities:
 
 ```mermaid
 graph TB
@@ -697,11 +703,11 @@ The dataset contains substantial transit information:
 - Temporal service patterns
 
 ### Geographic Capabilities
-- **Spatial Indexing**: Fast geo queries with `@index(geo)`
-- **Radius Searches**: Find stops within specific distances
+- **Spatial Indexing**: Fast geo queries with spatial indexes
+- **Distance Calculations**: Find stops within specific distances using `point.distance()`
 - **Polygon Queries**: Complex geographic area queries
 - **Bounding Box**: Efficient rectangular area searches
-- **Near Queries**: Proximity-based stop discovery
+- **Point Queries**: Proximity-based stop discovery
 
 ### Example Use Cases
 - **Transit Planning**: Find optimal routes between locations
@@ -716,16 +722,11 @@ The following examples demonstrate the query capabilities of the GTFS knowledge 
 
 ### 🚌 Query 1: All Transit Agencies
 
-**DQL Query:**
-```dql
-{
-  agencies(func: type(Agency)) {
-    agency_id
-    agency_name
-    agency_url
-    agency_timezone
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (a:Agency)
+RETURN a.agency_id, a.agency_name, a.agency_url, a.agency_timezone
+ORDER BY a.agency_name
 ```
 
 **Result:**
@@ -756,16 +757,12 @@ AGENCIES (12 items):
 
 ### 🛣️ Query 2: Bus Routes
 
-**DQL Query:**
-```dql
-{
-  routes(func: type(Route)) @filter(eq(route_type, 3)) {
-    route_id
-    route_short_name
-    route_long_name
-    route_type
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (r:Route)
+WHERE r.route_type = 3
+RETURN r.route_id, r.route_short_name, r.route_long_name, r.route_type
+ORDER BY r.route_short_name
 ```
 
 **Result:**
@@ -795,17 +792,13 @@ ROUTES (332 items):
 
 ### 📍 Query 3: Stops in Downtown Seattle Area
 
-**DQL Query:**
-```dql
-{
-  stops(func: type(Stop)) @filter(ge(stop_lat, 47.6) AND le(stop_lat, 47.62) AND ge(stop_lon, -122.35) AND le(stop_lon, -122.33)) {
-    stop_id
-    stop_name
-    stop_lat
-    stop_lon
-    stop_code
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (s:Stop)
+WHERE s.stop_lat >= 47.6 AND s.stop_lat <= 47.62 
+  AND s.stop_lon >= -122.35 AND s.stop_lon <= -122.33
+RETURN s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, s.stop_code
+ORDER BY s.stop_name
 ```
 
 **Result:**
@@ -839,17 +832,13 @@ STOPS (179 items):
 
 ### 🎯 Query 4: Stops Near Pike Place Market
 
-**DQL Query:**
-```dql
-{
-  stops(func: type(Stop)) @filter(ge(stop_lat, 47.6092) AND le(stop_lat, 47.6102) AND ge(stop_lon, -122.3426) AND le(stop_lon, -122.3376)) {
-    stop_id
-    stop_name
-    stop_lat
-    stop_lon
-    stop_code
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (s:Stop)
+WHERE s.stop_lat >= 47.6092 AND s.stop_lat <= 47.6102 
+  AND s.stop_lon >= -122.3426 AND s.stop_lon <= -122.3376
+RETURN s.stop_id, s.stop_name, s.stop_lat, s.stop_lon, s.stop_code
+ORDER BY s.stop_name
 ```
 
 **Result:**
@@ -882,22 +871,14 @@ STOPS (25 items):
 
 ### 📅 Query 5: Service Calendar
 
-**DQL Query:**
-```dql
-{
-  calendar(func: type(Calendar), first: 10) {
-    service_id
-    monday
-    tuesday
-    wednesday
-    thursday
-    friday
-    saturday
-    sunday
-    start_date
-    end_date
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (c:Calendar)
+RETURN c.service_id, c.monday, c.tuesday, c.wednesday, 
+       c.thursday, c.friday, c.saturday, c.sunday,
+       c.start_date, c.end_date
+ORDER BY c.service_id
+LIMIT 10
 ```
 
 **Result:**
@@ -946,17 +927,12 @@ CALENDAR (10 items):
 
 ### 💰 Query 6: Fare Information
 
-**DQL Query:**
-```dql
-{
-  fares(func: type(FareAttribute), first: 10) {
-    fare_id
-    price
-    currency_type
-    payment_method
-    transfers
-  }
-}
+**Cypher Query:**
+```cypher
+MATCH (f:FareAttribute)
+RETURN f.fare_id, f.price, f.currency_type, f.payment_method, f.transfers
+ORDER BY f.fare_id
+LIMIT 10
 ```
 
 **Result:**
@@ -972,10 +948,10 @@ To execute these queries yourself:
 
 ```bash
 # Run all sample queries
-uvx run sample_queries.py
+uvx run sample_queries_neo4j.py
 
-# Or run individual queries using the Dgraph Ratel UI
-# Navigate to http://localhost:8001 in your browser
+# Or run individual queries using the Neo4j Browser
+# Navigate to http://localhost:7474 in your browser
 ```
 
 ### 🔧 Customizing Queries
@@ -1007,7 +983,7 @@ Modify the sample queries to explore different aspects of the transit data:
 
 ### Import Settings
 - **Batch Size**: Adjust based on available memory (default: 1000)
-- **Dgraph Connection**: Connect to local or remote Dgraph instances
+- **Neo4j Connection**: Connect to local or remote Neo4j instances
 - **Data Directory**: Specify custom GTFS data location
 - **Logging Level**: Control verbosity of import process
 
@@ -1020,14 +996,14 @@ Modify the sample queries to explore different aspects of the transit data:
   - `--reset-progress`: Reset all progress to start fresh
   - `--clear-progress`: Remove progress file completely
 
-### Dgraph Settings
-- **Ports**: Configurable endpoints for HTTP, GraphQL, and gRPC
+### Neo4j Settings
+- **Ports**: Configurable endpoints for Bolt and HTTP
 - **Memory**: Adjustable resource allocation
 - **Persistence**: Data persistence across container restarts
 
 ## 🔒 Security Considerations
 
-- **Network Access**: Dgraph is configured for local development
+- **Network Access**: Neo4j is configured for local development
 - **Data Validation**: Input sanitization and type checking
 - **Error Handling**: Secure error messages without data leakage
 - **Access Control**: Configure appropriate access controls for production use
@@ -1038,10 +1014,10 @@ Modify the sample queries to explore different aspects of the transit data:
 - [GTFS Reference](https://developers.google.com/transit/gtfs/reference)
 - [GTFS Best Practices](https://gtfs.org/best-practices/)
 
-### Dgraph Documentation
-- [Dgraph Documentation](https://dgraph.io/docs/)
-- [DQL Query Language](https://dgraph.io/docs/query-language/)
-- [GraphQL+ Interface](https://dgraph.io/docs/graphql/)
+### Neo4j Documentation
+- [Neo4j Documentation](https://neo4j.com/docs/)
+- [Cypher Query Language](https://neo4j.com/docs/cypher-manual/)
+- [Neo4j Browser](https://neo4j.com/docs/browser-manual/)
 
 ### Transit Data
 - [Transit.land](https://transit.land/) - Open transit data
@@ -1058,12 +1034,12 @@ This project welcomes contributions in several areas:
 
 ## 📄 License
 
-This project is provided as-is for educational and development purposes. The GTFS data format is an open standard, and Dgraph is open-source software.
+This project is provided as-is for educational and development purposes. The GTFS data format is an open standard, and Neo4j Community Edition is open-source software.
 
 ## 🆘 Support
 
 ### Common Issues
-1. **Dgraph Connection**: Ensure Dgraph server is running and accessible
+1. **Neo4j Connection**: Ensure Neo4j server is running and accessible
 2. **Data Import**: Check GTFS file format and encoding
 3. **Memory Issues**: Reduce batch size for large datasets
 4. **Query Performance**: Use appropriate indexes and filters
