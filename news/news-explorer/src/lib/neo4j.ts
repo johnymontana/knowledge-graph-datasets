@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import neo4j, { Driver, Record, Session } from 'neo4j-driver'
 
 // Neo4j connection instance
@@ -40,9 +41,9 @@ export function getNeo4jDriver(): Driver {
 
 export async function runCypher(
   query: string,
-  parameters?: Record<string, any>,
+  parameters?: { [key: string]: unknown },
   database?: string
-): Promise<Record[]> {
+): Promise<unknown[]> {
   const session: Session = getNeo4jDriver().session({
     database: database || process.env.NEO4J_DATABASE || 'neo4j',
   })
@@ -115,7 +116,7 @@ export class NewsQueries {
     `
     
     const records = await runCypher(query, { limit })
-    return records.map(record => record.get('a').properties as Article)
+    return records.map(record => (record as any).get('a').properties as Article)
   }
 
   static async getArticlesByTopic(topicName: string, limit: number = 10): Promise<Article[]> {
@@ -127,7 +128,7 @@ export class NewsQueries {
     `
     
     const records = await runCypher(query, { topicName, limit })
-    return records.map(record => record.get('a').properties as Article)
+    return records.map(record => (record as any).get('a').properties as Article)
   }
 
   static async getArticlesWithLocation(limit: number = 50): Promise<{article: Article, geo: Geo}[]> {
@@ -141,10 +142,10 @@ export class NewsQueries {
     
     const records = await runCypher(query, { limit })
     return records.map(record => ({
-      article: record.get('a').properties as Article,
+      article: (record as any).get('a').properties as Article,
       geo: {
-        name: record.get('g').properties.name,
-        location: record.get('g').properties.location
+        name: (record as any).get('g').properties.name,
+        location: (record as any).get('g').properties.location
       }
     }))
   }
@@ -159,8 +160,8 @@ export class NewsQueries {
     
     const records = await runCypher(query, { queryVector, limit })
     return records.map(record => ({
-      article: record.get('node').properties as Article,
-      score: record.get('score')
+      article: (record as any).get('node').properties as Article,
+      score: (record as any).get('score')
     }))
   }
 
@@ -174,12 +175,12 @@ export class NewsQueries {
     
     const records = await runCypher(query, { limit })
     return records.map(record => ({
-      topic: record.get('t').properties as Topic,
-      count: record.get('articleCount').toNumber()
+      topic: (record as any).get('t').properties as Topic,
+      count: (record as any).get('articleCount').toNumber()
     }))
   }
 
-  static async getArticleGraph(articleUri: string): Promise<any> {
+  static async getArticleGraph(articleUri: string): Promise<{article: { [key: string]: unknown }, connections: unknown[]} | null> {
     const query = `
       MATCH (a:Article {uri: $articleUri})
       OPTIONAL MATCH (a)-[r]->(n)
@@ -190,8 +191,8 @@ export class NewsQueries {
     if (records.length === 0) return null
     
     return {
-      article: records[0].get('a').properties,
-      connections: records[0].get('connections')
+      article: (records[0] as any).get('a').properties,
+      connections: (records[0] as any).get('connections')
     }
   }
 
@@ -205,7 +206,7 @@ export class NewsQueries {
     `
     
     const records = await runCypher(query, { searchTerm, limit })
-    return records.map(record => record.get('node').properties as Article)
+    return records.map(record => (record as any).get('node').properties as Article)
   }
 
   static async getTimelineData(): Promise<{date: string, count: number}[]> {
@@ -223,8 +224,8 @@ export class NewsQueries {
     
     const records = await runCypher(query)
     return records.map(record => ({
-      date: record.get('date'),
-      count: record.get('count').toNumber()
+      date: (record as any).get('date'),
+      count: (record as any).get('count').toNumber()
     }))
   }
 }

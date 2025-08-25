@@ -1,7 +1,7 @@
 import { openai } from '@ai-sdk/openai'
 import { anthropic } from '@ai-sdk/anthropic'
 import { streamText } from 'ai'
-import { NewsQueries, runCypher } from '@/lib/neo4j'
+import { NewsQueries } from '@/lib/neo4j'
 
 export const runtime = 'nodejs'
 
@@ -99,9 +99,8 @@ Current user question: "${lastMessage}"`
       ],
     })
 
-    return result.toDataStreamResponse()
-  } catch (error) {
-    console.error('Chat API error:', error)
+    return result.toTextStreamResponse()
+  } catch {
     return new Response('An error occurred while processing your request.', {
       status: 500,
     })

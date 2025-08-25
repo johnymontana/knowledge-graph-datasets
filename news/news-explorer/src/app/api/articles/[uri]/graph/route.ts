@@ -1,12 +1,30 @@
 import { NextResponse } from 'next/server'
 import { NewsQueries } from '@/lib/neo4j'
 
+interface GraphNode {
+  id: string
+  label: string
+  type: string
+  size: number
+  color: string
+  data: Record<string, unknown>
+}
+
+interface GraphEdge {
+  id: string
+  source: string
+  target: string
+  type: string
+  color: string
+}
+
 export async function GET(
   request: Request,
-  { params }: { params: { uri: string } }
+  { params }: { params: Promise<{ uri: string }> }
 ) {
   try {
-    const articleUri = decodeURIComponent(params.uri)
+    const { uri } = await params
+    const articleUri = decodeURIComponent(uri)
     const graphData = await NewsQueries.getArticleGraph(articleUri)
     
     if (!graphData) {
@@ -14,27 +32,29 @@ export async function GET(
     }
 
     // Transform the graph data into the format expected by the graph component
-    const nodes = []
-    const edges = []
+    const nodes: GraphNode[] = []
+    const edges: GraphEdge[] = []
 
     // Add the central article node
+    const article = graphData.article as unknown as Record<string, unknown>
     nodes.push({
-      id: graphData.article.uri,
-      label: graphData.article.title || 'Article',
+      id: (article.uri as string) || articleUri,
+      label: (article.title as string) || 'Article',
       type: 'article',
       size: 20,
       color: '#3182ce',
-      data: graphData.article
+      data: article
     })
 
     // Add connected nodes and edges
-    graphData.connections.forEach((connection: any, index: number) => {
+    const connections = graphData.connections as Array<Record<string, unknown>>
+    connections.forEach((connection, index) => {
       const nodeId = `${connection.relationship}-${index}`
       let nodeType = 'topic'
       let color = '#38a169'
       
       // Determine node type and color based on relationship
-      switch (connection.relationship) {
+      switch (connection.relationship as string) {
         case 'HAS_TOPIC':
           nodeType = 'topic'
           color = '#38a169'
@@ -57,20 +77,23 @@ export async function GET(
           break
       }
 
+      const node = connection.node as Record<string, unknown>
+      const properties = node.properties as Record<string, unknown>
+      
       nodes.push({
         id: nodeId,
-        label: connection.node.properties?.name || connection.node.properties?.title || 'Unknown',
+        label: (properties?.name as string) || (properties?.title as string) || 'Unknown',
         type: nodeType,
         size: 15,
         color,
-        data: connection.node.properties
+        data: properties
       })
 
       edges.push({
         id: `edge-${index}`,
-        source: graphData.article.uri,
+        source: (article.uri as string) || articleUri,
         target: nodeId,
-        type: connection.relationship,
+        type: connection.relationship as string,
         color: '#e2e8f0'
       })
     })

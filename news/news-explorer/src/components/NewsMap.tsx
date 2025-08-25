@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Map, MapRef, Marker, Popup } from '@vis.gl/react-maplibre'
-import { Box, Text, VStack, Badge, Link, Spinner, Alert } from '@chakra-ui/react'
+import { Box, Text, VStack, Badge, Link, Spinner, Alert, AlertIcon } from '@chakra-ui/react'
 import { Article, Geo } from '@/lib/neo4j'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -23,7 +23,7 @@ export default function NewsMap({ articles, onArticleSelect, height = '600px' }:
   const mapRef = useRef<MapRef>(null)
   const [popupInfo, setPopupInfo] = useState<PopupInfo | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error] = useState<string | null>(null)
 
   useEffect(() => {
     setIsLoading(false)
@@ -54,12 +54,10 @@ export default function NewsMap({ articles, onArticleSelect, height = '600px' }:
 
   if (error) {
     return (
-      <Alert.Root status="error" height={height}>
-        <Alert.Indicator />
-        <Alert.Content>
-          {error}
-        </Alert.Content>
-      </Alert.Root>
+      <Alert status="error" height={height}>
+        <AlertIcon />
+        {error}
+      </Alert>
     )
   }
 

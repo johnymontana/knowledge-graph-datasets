@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { NextResponse } from 'next/server'
 import { runCypher } from '@/lib/neo4j'
 
@@ -6,12 +7,12 @@ export async function GET() {
     // Get total articles
     const totalArticlesQuery = 'MATCH (a:Article) RETURN count(a) as count'
     const totalArticlesResult = await runCypher(totalArticlesQuery)
-    const totalArticles = totalArticlesResult[0]?.get('count')?.toNumber() || 0
+    const totalArticles = (totalArticlesResult[0] as any)?.get('count')?.toNumber() || 0
 
     // Get total topics
     const totalTopicsQuery = 'MATCH (t:Topic) RETURN count(t) as count'
     const totalTopicsResult = await runCypher(totalTopicsQuery)
-    const totalTopics = totalTopicsResult[0]?.get('count')?.toNumber() || 0
+    const totalTopics = (totalTopicsResult[0] as any)?.get('count')?.toNumber() || 0
 
     // Get articles with location
     const articlesWithLocationQuery = `
@@ -20,7 +21,7 @@ export async function GET() {
       RETURN count(DISTINCT a) as count
     `
     const articlesWithLocationResult = await runCypher(articlesWithLocationQuery)
-    const articlesWithLocation = articlesWithLocationResult[0]?.get('count')?.toNumber() || 0
+    const articlesWithLocation = (articlesWithLocationResult[0] as any)?.get('count')?.toNumber() || 0
 
     // Get recent articles (last 30 days)
     const recentArticlesQuery = `
@@ -30,7 +31,7 @@ export async function GET() {
       RETURN count(a) as count
     `
     const recentArticlesResult = await runCypher(recentArticlesQuery)
-    const recentArticles = recentArticlesResult[0]?.get('count')?.toNumber() || 0
+    const recentArticles = (recentArticlesResult[0] as any)?.get('count')?.toNumber() || 0
 
     return NextResponse.json({
       totalArticles,

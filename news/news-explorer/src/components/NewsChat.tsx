@@ -14,7 +14,7 @@ import {
   IconButton,
   Tooltip,
   Alert,
-
+  AlertIcon,
   Spinner,
   Badge
 } from '@chakra-ui/react'
@@ -63,7 +63,6 @@ export default function NewsChat({
       
       if (!response.ok) throw new Error('Failed to send message')
       
-      const data = await response.json()
       // For now, just add a simple response
       const assistantMessage = {
         id: (Date.now() + 1).toString(),
@@ -121,15 +120,15 @@ export default function NewsChat({
               </Text>
               <VStack spacing={2}>
                 <Badge colorScheme="blue" size="sm">Try asking:</Badge>
-                <Text fontSize="sm" color="gray.600">"Show me recent articles"</Text>
-                <Text fontSize="sm" color="gray.600">"What topics are most popular?"</Text>
-                <Text fontSize="sm" color="gray.600">"Find articles about climate change"</Text>
-                <Text fontSize="sm" color="gray.600">"Show me articles from New York"</Text>
+                <Text fontSize="sm" color="gray.600">&ldquo;Show me recent articles&rdquo;</Text>
+                <Text fontSize="sm" color="gray.600">&ldquo;What topics are most popular?&rdquo;</Text>
+                <Text fontSize="sm" color="gray.600">&ldquo;Find articles about climate change&rdquo;</Text>
+                <Text fontSize="sm" color="gray.600">&ldquo;Show me articles from New York&rdquo;</Text>
               </VStack>
             </Box>
           )}
 
-          {messages.map((message, index) => (
+          {messages.map((message) => (
             <HStack
               key={message.id}
               align="start"
@@ -222,14 +221,12 @@ export default function NewsChat({
       </Box>
 
       {error && (
-        <Alert.Root status="error" size="sm">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Text fontSize="sm">
-            {error.message || 'An error occurred. Please try again.'}
+        <Alert status="error" size="sm">
+          <AlertIcon />
+          <Text fontSize="sm">
+            {error || 'An error occurred. Please try again.'}
           </Text>
-          </Alert.Content>
-        </Alert.Root>
+        </Alert>
       )}
 
       {/* Input */}

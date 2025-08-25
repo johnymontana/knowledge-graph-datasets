@@ -5,28 +5,21 @@ import {
   Box,
   Container,
   Grid,
-  GridItem,
   VStack,
   HStack,
   Text,
   Card,
   CardHeader,
   CardBody,
-  Tabs,
-  TabList,
-  TabPanels,
-  Tab,
-  TabPanel,
   Button,
   Badge,
   Alert,
-
+  AlertIcon,
   Spinner,
   Stat,
   StatLabel,
   StatNumber,
   StatHelpText,
-  Select,
   Input,
   InputGroup,
   InputLeftElement,
@@ -35,7 +28,9 @@ import { Search, Map, MessageSquare, BarChart3, Globe, Calendar, Users, FileText
 import NewsMap from '@/components/NewsMap'
 import NewsGraph from '@/components/NewsGraph'
 import NewsChat from '@/components/NewsChat'
-import { Article, Geo, NewsQueries } from '@/lib/neo4j'
+import { Article, Geo } from '@/lib/neo4j'
+
+
 
 interface DashboardStats {
   totalArticles: number
@@ -49,7 +44,23 @@ export default function HomePage() {
   const [articles, setArticles] = useState<Array<{ article: Article; geo: Geo }>>([])
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
-  const [graphData, setGraphData] = useState<any>({ nodes: [], edges: [] })
+  const [graphData, setGraphData] = useState<{ 
+    nodes: Array<{
+      id: string
+      label: string
+      type: 'article' | 'topic' | 'person' | 'organization' | 'geo' | 'author'
+      size: number
+      color: string
+      data: Record<string, unknown>
+    }>
+    edges: Array<{
+      id: string
+      source: string
+      target: string
+      type: string
+      color: string
+    }>
+  }>({ nodes: [], edges: [] })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
@@ -83,7 +94,12 @@ export default function HomePage() {
 
         // Load dashboard stats
         const statsResponse = await fetch('/api/stats').then(res => res.json())
-        setStats(statsResponse || stats)
+        setStats(statsResponse || {
+          totalArticles: 0,
+          totalTopics: 0,
+          articlesWithLocation: 0,
+          recentArticles: 0,
+        })
 
         setLoading(false)
       } catch (err) {
@@ -151,18 +167,16 @@ export default function HomePage() {
   if (error) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Alert.Root status="error">
-          <Alert.Indicator />
-          <Alert.Content>
-            <VStack align="start">
+        <Alert status="error">
+          <AlertIcon />
+          <VStack align="start">
             <Text fontWeight="bold">Error loading data</Text>
             <Text fontSize="sm">{error}</Text>
             <Button size="sm" onClick={() => window.location.reload()}>
               Retry
             </Button>
-            </VStack>
-          </Alert.Content>
-        </Alert.Root>
+          </VStack>
+        </Alert>
       </Container>
     )
   }
@@ -430,7 +444,7 @@ export default function HomePage() {
             </CardHeader>
             <CardBody p={0}>
               <NewsGraph
-                article={selectedArticle}
+                article={selectedArticle || undefined}
                 graphData={graphData}
                 onNodeSelect={(node) => {
                   // Handle node selection if needed

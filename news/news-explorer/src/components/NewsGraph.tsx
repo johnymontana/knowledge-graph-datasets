@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Box, VStack, HStack, Text, Badge, Button, Select, Alert, Spinner } from '@chakra-ui/react'
+import { Box, VStack, HStack, Text, Badge, Button, Select, Alert, AlertIcon, Spinner } from '@chakra-ui/react'
 import { Article } from '@/lib/neo4j'
 
 // Define types for graph data
@@ -11,7 +11,7 @@ interface GraphNode {
   type: 'article' | 'topic' | 'person' | 'organization' | 'geo' | 'author'
   size: number
   color: string
-  data?: any
+  data?: Record<string, unknown>
 }
 
 interface GraphEdge {
@@ -52,7 +52,7 @@ const NODE_SIZES = {
   author: 8
 }
 
-export default function NewsGraph({ article, graphData, onNodeSelect, height = '600px' }: NewsGraphProps) {
+export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }: NewsGraphProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<string>('forceLayout')
@@ -84,7 +84,7 @@ export default function NewsGraph({ article, graphData, onNodeSelect, height = '
       container.appendChild(canvas)
 
       // Initialize node positions
-      const nodes = graphData.nodes.map((node, i) => ({
+      const nodes = graphData.nodes.map((node) => ({
         ...node,
         x: Math.random() * canvas.width,
         y: Math.random() * canvas.height,
@@ -241,23 +241,19 @@ export default function NewsGraph({ article, graphData, onNodeSelect, height = '
 
   if (error) {
     return (
-      <Alert.Root status="error" height={height}>
-        <Alert.Indicator />
-        <Alert.Content>
-          {error}
-        </Alert.Content>
-      </Alert.Root>
+      <Alert status="error" height={height}>
+        <AlertIcon />
+        {error}
+      </Alert>
     )
   }
 
   if (!graphData.nodes.length) {
     return (
-      <Alert.Root status="info" height={height}>
-        <Alert.Indicator />
-        <Alert.Content>
-          No graph data available. Select an article to view its connections.
-        </Alert.Content>
-      </Alert.Root>
+      <Alert status="info" height={height}>
+        <AlertIcon />
+        No graph data available. Select an article to view its connections.
+      </Alert>
     )
   }
 
