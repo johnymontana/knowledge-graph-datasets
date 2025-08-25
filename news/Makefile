@@ -1,4 +1,4 @@
-.PHONY: help install dev-install clean test format lint run-import run-import-optimized run-import-fast run-embeddings run-query run-vector-search run-validate
+.PHONY: help install dev-install clean test format lint run-import run-import-optimized run-import-fast run-embeddings run-query run-vector-search run-validate run-geocode run-geocode-batch check-geo-status check-ollama geocode-workflow geocode-setup
 
 help: ## Show this help message
 	@echo "News Knowledge Graph (Neo4j) - Available Commands:"
@@ -64,6 +64,54 @@ run-vector-search: ## Run vector similarity search (requires query argument)
 
 run-validate: ## Run news data validation for Neo4j
 	uv run test_news_data_neo4j.py
+
+run-geocode: ## Geocode Geo nodes without location property
+	@echo "🌍 Geocoding Geo nodes without location property..."
+	uv run --env-file config.env geocode_geo_nodes.py
+
+run-geocode-batch: ## Geocode Geo nodes with custom batch size and delay
+	@if [ -z "$(batch)" ] || [ -z "$(delay)" ]; then \
+		echo "❌ Please provide batch size and delay: make run-geocode-batch batch=5 delay=2.0"; \
+		exit 1; \
+	fi
+	@echo "🌍 Geocoding Geo nodes with batch size $(batch) and delay $(delay)s..."
+	uv run --env-file config.env geocode_geo_nodes.py $(batch) $(delay)
+
+check-ollama: ## Check if Ollama is running and accessible
+	@echo "🤖 Checking Ollama status..."
+	@curl -s http://localhost:11434/api/tags > /dev/null 2>&1 && echo "✅ Ollama is running" || echo "❌ Ollama is not running or not accessible"
+
+check-geo-status: ## Check status of Geo nodes (with/without location)
+	@echo "📊 Checking Geo nodes status..."
+	uv run --env-file config.env check_geo_status.py
+
+geocode-workflow: ## Complete geocoding workflow: check status, geocode, then check again
+	@echo "🔄 Starting complete geocoding workflow..."
+	@echo ""
+	@echo "📊 Step 1: Checking initial status..."
+	@make check-geo-status
+	@echo ""
+	@echo "🌍 Step 2: Running geocoding..."
+	@make run-geocode
+	@echo ""
+	@echo "📊 Step 3: Checking final status..."
+	@make check-geo-status
+	@echo ""
+	@echo "✅ Geocoding workflow complete!"
+
+geocode-setup: ## Check prerequisites for geocoding (Neo4j + Ollama)
+	@echo "🔧 Checking geocoding prerequisites..."
+	@echo ""
+	@echo "📊 Checking Neo4j status..."
+	@make status
+	@echo ""
+	@echo "🤖 Checking Ollama status..."
+	@make check-ollama
+	@echo ""
+	@echo "🌍 Checking Geo nodes status..."
+	@make check-geo-status
+	@echo ""
+	@echo "✅ Prerequisites check complete!"
 
 start-neo4j: ## Start Neo4j services
 	docker-compose up -d
