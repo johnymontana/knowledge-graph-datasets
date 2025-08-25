@@ -1,4 +1,4 @@
-.PHONY: help install dev-install clean test format lint run-import run-embeddings run-query run-vector-search run-validate
+.PHONY: help install dev-install clean test format lint run-import run-import-optimized run-import-fast run-embeddings run-query run-vector-search run-validate
 
 help: ## Show this help message
 	@echo "News Knowledge Graph (Neo4j) - Available Commands:"
@@ -42,6 +42,12 @@ lint: ## Lint code with flake8
 
 run-import: ## Run news import script for Neo4j
 	uv run news_import_neo4j.py
+
+run-import-optimized: ## Run optimized news import script for Neo4j (faster)
+	uv run news_import_neo4j_optimized.py --skip-geocoding --skip-embeddings
+
+run-import-fast: ## Run ultra-fast news import (no AI features)
+	uv run news_import_neo4j_optimized.py --skip-geocoding --skip-embeddings --limit 100
 
 run-embeddings: ## Run news embeddings generation for Neo4j
 	uv run news_embeddings_neo4j.py

@@ -74,8 +74,8 @@ class Neo4jConfig:
             query_params = parse_qs(parsed.query)
             
             # SSL/Encryption configuration
-            self.encrypted = query_params.get('encrypted', ['true'])[0].lower() == 'true'
-            self.trust = query_params.get('trust', [None])[0]
+            self.encrypted = query_params.get('encrypted', [os.getenv('NEO4J_ENCRYPTED', 'true')])[0].lower() == 'true'
+            self.trust = query_params.get('trust', [os.getenv('NEO4J_TRUST', None)])[0]
             
             # Additional parameters
             self.additional_params = {k: v[0] for k, v in query_params.items() 
