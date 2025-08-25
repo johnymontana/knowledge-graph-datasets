@@ -20,7 +20,7 @@ import {
   Button,
   Badge,
   Alert,
-  AlertIcon,
+
   Spinner,
   Stat,
   StatLabel,
@@ -45,11 +45,12 @@ interface DashboardStats {
 }
 
 export default function HomePage() {
+  const [mounted, setMounted] = useState(false)
   const [articles, setArticles] = useState<Array<{ article: Article; geo: Geo }>>([])
   const [recentArticles, setRecentArticles] = useState<Article[]>([])
   const [selectedArticle, setSelectedArticle] = useState<Article | null>(null)
   const [graphData, setGraphData] = useState<any>({ nodes: [], edges: [] })
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [stats, setStats] = useState<DashboardStats>({
     totalArticles: 0,
@@ -59,6 +60,11 @@ export default function HomePage() {
   })
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedView, setSelectedView] = useState<'overview' | 'map' | 'graph' | 'chat'>('overview')
+
+  // Set mounted state to prevent hydration issues
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   // Load initial data
   useEffect(() => {
@@ -119,6 +125,18 @@ export default function HomePage() {
     }
   }
 
+  // Prevent hydration issues by not rendering until mounted
+  if (!mounted) {
+    return (
+      <Box height="100vh" display="flex" alignItems="center" justifyContent="center">
+        <VStack spacing={4}>
+          <Spinner size="xl" color="blue.500" />
+          <Text>Initializing...</Text>
+        </VStack>
+      </Box>
+    )
+  }
+
   if (loading) {
     return (
       <Box height="100vh" display="flex" alignItems="center" justifyContent="center">
@@ -133,16 +151,18 @@ export default function HomePage() {
   if (error) {
     return (
       <Container maxW="container.xl" py={8}>
-        <Alert status="error">
-          <AlertIcon />
-          <VStack align="start">
+        <Alert.Root status="error">
+          <Alert.Indicator />
+          <Alert.Content>
+            <VStack align="start">
             <Text fontWeight="bold">Error loading data</Text>
             <Text fontSize="sm">{error}</Text>
             <Button size="sm" onClick={() => window.location.reload()}>
               Retry
             </Button>
-          </VStack>
-        </Alert>
+            </VStack>
+          </Alert.Content>
+        </Alert.Root>
       </Container>
     )
   }
@@ -244,14 +264,14 @@ export default function HomePage() {
             <Grid templateColumns="repeat(auto-fit, minmax(250px, 1fr))" gap={6}>
               <Card>
                 <CardBody>
-                  <Stat>
-                    <StatLabel display="flex" alignItems="center" gap={2}>
-                      <FileText size={16} />
-                      Total Articles
-                    </StatLabel>
-                    <StatNumber>{stats.totalArticles.toLocaleString()}</StatNumber>
-                    <StatHelpText>In the knowledge graph</StatHelpText>
-                  </Stat>
+                          <Stat>
+            <StatLabel display="flex" alignItems="center" gap={2}>
+              <FileText size={16} />
+              Total Articles
+            </StatLabel>
+            <StatNumber>{stats.totalArticles.toLocaleString()}</StatNumber>
+            <StatHelpText>In the knowledge graph</StatHelpText>
+          </Stat>
                 </CardBody>
               </Card>
 

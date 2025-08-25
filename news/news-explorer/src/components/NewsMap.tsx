@@ -1,8 +1,8 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Map, MapRef, Marker, Popup } from 'react-map-gl'
-import { Box, Text, VStack, Badge, Link, Spinner, Alert, AlertIcon } from '@chakra-ui/react'
+import { Map, MapRef, Marker, Popup } from '@vis.gl/react-maplibre'
+import { Box, Text, VStack, Badge, Link, Spinner, Alert } from '@chakra-ui/react'
 import { Article, Geo } from '@/lib/neo4j'
 import 'maplibre-gl/dist/maplibre-gl.css'
 
@@ -54,10 +54,12 @@ export default function NewsMap({ articles, onArticleSelect, height = '600px' }:
 
   if (error) {
     return (
-      <Alert status="error" height={height}>
-        <AlertIcon />
-        {error}
-      </Alert>
+      <Alert.Root status="error" height={height}>
+        <Alert.Indicator />
+        <Alert.Content>
+          {error}
+        </Alert.Content>
+      </Alert.Root>
     )
   }
 

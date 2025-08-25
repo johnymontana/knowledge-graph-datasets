@@ -1,6 +1,6 @@
 'use client'
 
-import { useChat } from 'ai/react'
+import { useState } from 'react'
 import {
   Box,
   VStack,
@@ -14,12 +14,11 @@ import {
   IconButton,
   Tooltip,
   Alert,
-  AlertIcon,
+
   Spinner,
   Badge
 } from '@chakra-ui/react'
 import { Send, Bot, User, Copy, ThumbsUp, ThumbsDown } from 'lucide-react'
-import { useState } from 'react'
 
 interface NewsChatProps {
   height?: string
@@ -30,9 +29,55 @@ export default function NewsChat({
   height = '600px', 
   placeholder = 'Ask me about the news dataset...' 
 }: NewsChatProps) {
-  const { messages, input, handleInputChange, handleSubmit, isLoading, error } = useChat({
-    api: '/api/chat',
-  })
+  const [input, setInput] = useState('')
+  const [messages, setMessages] = useState<Array<{id: string, role: 'user' | 'assistant', content: string, createdAt: Date}>>([])
+  const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setInput(e.target.value)
+  }
+  
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!input.trim() || isLoading) return
+    
+    const userMessage = {
+      id: Date.now().toString(),
+      role: 'user' as const,
+      content: input,
+      createdAt: new Date()
+    }
+    
+    setMessages(prev => [...prev, userMessage])
+    setInput('')
+    setIsLoading(true)
+    setError(null)
+    
+    try {
+      const response = await fetch('/api/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ messages: [...messages, userMessage] })
+      })
+      
+      if (!response.ok) throw new Error('Failed to send message')
+      
+      const data = await response.json()
+      // For now, just add a simple response
+      const assistantMessage = {
+        id: (Date.now() + 1).toString(),
+        role: 'assistant' as const,
+        content: 'This is a placeholder response. The chat API is being configured.',
+        createdAt: new Date()
+      }
+      setMessages(prev => [...prev, assistantMessage])
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to send message')
+    } finally {
+      setIsLoading(false)
+    }
+  }
   
   const [copiedMessageId, setCopiedMessageId] = useState<string | null>(null)
 
@@ -177,12 +222,14 @@ export default function NewsChat({
       </Box>
 
       {error && (
-        <Alert status="error" size="sm">
-          <AlertIcon />
-          <Text fontSize="sm">
+        <Alert.Root status="error" size="sm">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Text fontSize="sm">
             {error.message || 'An error occurred. Please try again.'}
           </Text>
-        </Alert>
+          </Alert.Content>
+        </Alert.Root>
       )}
 
       {/* Input */}

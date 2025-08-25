@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
-import { Box, VStack, HStack, Text, Badge, Button, Select, Alert, AlertIcon, Spinner } from '@chakra-ui/react'
+import { Box, VStack, HStack, Text, Badge, Button, Select, Alert, Spinner } from '@chakra-ui/react'
 import { Article } from '@/lib/neo4j'
 
 // Define types for graph data
@@ -241,19 +241,23 @@ export default function NewsGraph({ article, graphData, onNodeSelect, height = '
 
   if (error) {
     return (
-      <Alert status="error" height={height}>
-        <AlertIcon />
-        {error}
-      </Alert>
+      <Alert.Root status="error" height={height}>
+        <Alert.Indicator />
+        <Alert.Content>
+          {error}
+        </Alert.Content>
+      </Alert.Root>
     )
   }
 
   if (!graphData.nodes.length) {
     return (
-      <Alert status="info" height={height}>
-        <AlertIcon />
-        No graph data available. Select an article to view its connections.
-      </Alert>
+      <Alert.Root status="info" height={height}>
+        <Alert.Indicator />
+        <Alert.Content>
+          No graph data available. Select an article to view its connections.
+        </Alert.Content>
+      </Alert.Root>
     )
   }
 

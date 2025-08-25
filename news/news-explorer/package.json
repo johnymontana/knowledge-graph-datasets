@@ -11,7 +11,8 @@
   "dependencies": {
     "@ai-sdk/anthropic": "^2.0.6",
     "@ai-sdk/openai": "^2.0.19",
-    "@chakra-ui/react": "^3.25.0",
+    "@ai-sdk/react": "^2.0.22",
+    "@chakra-ui/react": "^2.10.9",
     "@emotion/react": "^11.14.0",
     "@emotion/styled": "^11.14.1",
     "@types/maplibre-gl": "^1.13.2",
@@ -25,6 +26,7 @@
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-map-gl": "^8.0.4",
+    "react-native-vercel-ai": "^0.1.2",
     "recharts": "^3.1.2",
     "sigma": "^3.0.2"
   },
