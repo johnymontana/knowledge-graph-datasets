@@ -231,13 +231,14 @@ export class NewsQueries {
     }
   }
 
+  // FIXME: This should use vector search instead of fulltext search
   static async searchArticles(searchTerm: string, limit: number = 20): Promise<Article[]> {
     const query = `
       CALL db.index.fulltext.queryNodes('article_text', $searchTerm)
       YIELD node, score
       RETURN node
       ORDER BY score DESC
-      LIMIT $limit
+      LIMIT toInteger($limit)
     `
     
     const records = await runCypher(query, { searchTerm, limit })
