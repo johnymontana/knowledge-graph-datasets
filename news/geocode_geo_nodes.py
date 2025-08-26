@@ -65,7 +65,7 @@ class Neo4jGeocoder:
             query = """
             MATCH (g:Geo)
             WHERE id(g) = $node_id
-            SET g.location = point({latitude: $latitude, longitude: $longitude})
+            SET g.location = point({latitude: $latitude, longitude: $longitude, srid: 4326})
             RETURN g.name as name
             """
             result = session.run(query, node_id=node_id, latitude=latitude, longitude=longitude)

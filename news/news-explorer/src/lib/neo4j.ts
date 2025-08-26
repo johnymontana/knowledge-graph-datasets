@@ -112,7 +112,7 @@ export class NewsQueries {
       MATCH (a:Article)
       RETURN a
       ORDER BY a.published DESC
-      LIMIT $limit
+      LIMIT toInteger($limit)
     `
     
     const records = await runCypher(query, { limit })
@@ -135,19 +135,54 @@ export class NewsQueries {
     const query = `
       MATCH (a:Article)-[:LOCATED_IN]->(g:Geo)
       WHERE g.location IS NOT NULL
-      RETURN a, g
+      RETURN a, g, 
+             g.location.longitude as longitude, 
+             g.location.latitude as latitude,
+             toString(a.published) as published_str
       ORDER BY a.published DESC
-      LIMIT $limit
+      LIMIT toInteger($limit)
     `
     
     const records = await runCypher(query, { limit })
-    return records.map(record => ({
-      article: (record as any).get('a').properties as Article,
-      geo: {
-        name: (record as any).get('g').properties.name,
-        location: (record as any).get('g').properties.location
+    console.log('Raw Neo4j records:', records)
+    
+    return records.map(record => {
+      const longitude = (record as any).get('longitude')
+      const latitude = (record as any).get('latitude')
+      const publishedStr = (record as any).get('published_str')
+      
+      // Debug: Log the extracted coordinates and record structure
+      console.log('Record structure:', record)
+      console.log('Extracted coordinates:', { longitude, latitude, type: typeof longitude })
+      console.log('Published string:', publishedStr)
+      console.log('Article properties:', (record as any).get('a').properties)
+      console.log('Geo properties:', (record as any).get('g').properties)
+      
+      // Ensure coordinates are valid numbers
+      if (typeof longitude === 'number' && typeof latitude === 'number' && 
+          !isNaN(longitude) && !isNaN(latitude) &&
+          longitude >= -180 && longitude <= 180 && 
+          latitude >= -90 && latitude <= 90) {
+        
+        // Create article with properly formatted published date
+        const articleProps = (record as any).get('a').properties
+        const article: Article = {
+          ...articleProps,
+          published: publishedStr || articleProps.published
+        }
+        
+        return {
+          article,
+          geo: {
+            name: (record as any).get('g').properties.name,
+            location: { longitude, latitude }
+          }
+        }
+      } else {
+        console.warn(`Invalid coordinates extracted:`, { longitude, latitude })
+        return null
       }
-    }))
+    }).filter(item => item !== null) as {article: Article, geo: Geo}[]
   }
 
   static async vectorSearch(queryVector: number[], limit: number = 10): Promise<{article: Article, score: number}[]> {

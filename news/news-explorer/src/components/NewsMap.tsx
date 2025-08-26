@@ -36,11 +36,46 @@ export default function NewsMap({ articles, onArticleSelect, height = '600px' }:
     }
   }
 
-  const formatDate = (dateString: string) => {
+  const formatDate = (dateString: string | Date) => {
     try {
-      return new Date(dateString).toLocaleDateString()
-    } catch {
-      return dateString
+      let date: Date
+      
+      // Handle different date formats
+      if (dateString instanceof Date) {
+        date = dateString
+      } else if (typeof dateString === 'string') {
+        // Try parsing as ISO string first
+        if (dateString.includes('T') || dateString.includes('Z')) {
+          date = new Date(dateString)
+        } else {
+          // Try parsing as other common formats
+          const parsed = Date.parse(dateString)
+          if (!isNaN(parsed)) {
+            date = new Date(parsed)
+          } else {
+            // If all else fails, try to extract date parts
+            const dateMatch = dateString.match(/(\d{4})-(\d{1,2})-(\d{1,2})/)
+            if (dateMatch) {
+              const [, year, month, day] = dateMatch
+              date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day))
+            } else {
+              throw new Error('Unable to parse date')
+            }
+          }
+        }
+      } else {
+        throw new Error('Invalid date format')
+      }
+      
+      // Validate the date
+      if (isNaN(date.getTime())) {
+        throw new Error('Invalid date value')
+      }
+      
+      return date.toLocaleDateString()
+    } catch (error) {
+      console.warn('Failed to parse date:', dateString, error)
+      return 'Date unavailable'
     }
   }
 
@@ -134,7 +169,10 @@ export default function NewsMap({ articles, onArticleSelect, height = '600px' }:
                 
                 {popupInfo.article.published && (
                   <Text fontSize="xs" color="gray.500">
-                    {formatDate(popupInfo.article.published)}
+                    {(() => {
+                      console.log('Raw published date:', popupInfo.article.published, 'Type:', typeof popupInfo.article.published)
+                      return formatDate(popupInfo.article.published)
+                    })()}
                   </Text>
                 )}
 
