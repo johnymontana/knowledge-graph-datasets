@@ -111,22 +111,31 @@ export default function HomePage() {
     loadData()
   }, [])
 
-  // Load graph data when article is selected
+  // Load graph data when article is selected or when graph view is selected
   useEffect(() => {
-    if (selectedArticle) {
-      const loadGraphData = async () => {
-        try {
+    const loadGraphData = async () => {
+      try {
+        if (selectedArticle) {
+          // Load specific article graph
           const response = await fetch(`/api/articles/${encodeURIComponent(selectedArticle.uri)}/graph`)
           const data = await response.json()
           setGraphData(data || { nodes: [], edges: [] })
-        } catch (err) {
-          console.error('Failed to load graph data:', err)
-          setGraphData({ nodes: [], edges: [] })
+        } else if (selectedView === 'graph') {
+          // Load overview graph when no article is selected
+          console.log('Loading overview graph data...')
+          const response = await fetch('/api/graph/overview')
+          const data = await response.json()
+          console.log('Overview graph data received:', data)
+          setGraphData(data || { nodes: [], edges: [] })
         }
+      } catch (err) {
+        console.error('Failed to load graph data:', err)
+        setGraphData({ nodes: [], edges: [] })
       }
-      loadGraphData()
     }
-  }, [selectedArticle])
+    
+    loadGraphData()
+  }, [selectedArticle, selectedView])
 
   const handleSearch = async (term: string) => {
     if (!term.trim()) {

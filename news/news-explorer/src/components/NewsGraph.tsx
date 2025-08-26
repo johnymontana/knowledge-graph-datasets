@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useLayoutEffect } from 'react'
 import { Box, VStack, HStack, Text, Badge, Button, Select, Alert, AlertIcon, Spinner } from '@chakra-ui/react'
 import { Article } from '@/lib/neo4j'
 
@@ -58,11 +58,42 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<string>('forceLayout')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [containerReady, setContainerReady] = useState(false)
+
+  // Callback ref to ensure container is properly set
+  const setContainerRef = (element: HTMLDivElement | null) => {
+    console.log('setContainerRef called with:', element)
+    if (element) {
+      containerRef.current = element
+      console.log('Container ref set via callback:', element)
+      setContainerReady(true)
+    } else {
+      console.log('setContainerRef called with null - element unmounted')
+      setContainerReady(false)
+    }
+  }
 
   // Simple force-directed layout implementation
   useEffect(() => {
-    if (!containerRef.current || !graphData.nodes.length) return
+    console.log('NewsGraph useEffect triggered with:', { 
+      hasContainer: !!containerRef.current, 
+      nodesCount: graphData.nodes.length,
+      edgesCount: graphData.edges.length,
+      graphData 
+    })
+    
+    if (!graphData.nodes.length) return
 
+    // Wait for container to be available
+    if (!containerRef.current || !containerReady) {
+      console.log('Container not ready, waiting...', { 
+        hasRef: !!containerRef.current, 
+        containerReady 
+      })
+      return
+    }
+
+    console.log('Starting graph rendering...')
     setIsLoading(true)
     
     try {
@@ -229,7 +260,42 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
       setError(err instanceof Error ? err.message : 'Unknown error occurred')
       setIsLoading(false)
     }
-  }, [graphData, selectedNode, onNodeSelect])
+  }, [graphData, selectedNode, onNodeSelect, containerReady])
+
+  // Fallback effect to check container availability with polling
+  useEffect(() => {
+    console.log('Fallback effect running, containerRef.current:', containerRef.current)
+    
+    const checkContainer = () => {
+      if (containerRef.current && !containerReady) {
+        console.log('Container found via fallback check:', containerRef.current)
+        setContainerReady(true)
+        return true
+      }
+      return false
+    }
+    
+    // Check immediately
+    if (checkContainer()) return
+    
+    // Poll every 100ms until container is found
+    const interval = setInterval(() => {
+      if (checkContainer()) {
+        clearInterval(interval)
+      }
+    }, 100)
+    
+    // Also check after a longer delay as backup
+    const timer = setTimeout(() => {
+      clearInterval(interval)
+      checkContainer()
+    }, 1000)
+    
+    return () => {
+      clearInterval(interval)
+      clearTimeout(timer)
+    }
+  }, [containerReady])
 
   if (isLoading) {
     return (
@@ -250,10 +316,13 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
 
   if (!graphData.nodes.length) {
     return (
-      <Alert status="info" height={height}>
-        <AlertIcon />
-        No graph data available. Select an article to view its connections.
-      </Alert>
+      <Box height={height} display="flex" alignItems="center" justifyContent="center">
+        <VStack spacing={4}>
+          <Spinner size="xl" />
+          <Text>Loading graph data...</Text>
+          <Text fontSize="sm" color="gray.500">This may take a moment for large datasets</Text>
+        </VStack>
+      </Box>
     )
   }
 

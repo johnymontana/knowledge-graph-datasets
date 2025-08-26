@@ -263,4 +263,104 @@ export class NewsQueries {
       count: (record as any).get('count').toNumber()
     }))
   }
+
+  static async getOverviewGraph(): Promise<{
+    article: number
+    topic: number
+    person: number
+    organization: number
+    geo: number
+    author: number
+    sampleArticles: Article[]
+    sampleTopics: Topic[]
+    samplePeople: Person[]
+    sampleOrganizations: Organization[]
+    sampleLocations: Geo[]
+    sampleAuthors: Author[]
+  } | null> {
+    try {
+      // Get counts for each entity type
+      const countsQuery = `
+        MATCH (n)
+        RETURN labels(n)[0] as label, count(n) as count
+        ORDER BY label
+      `
+      
+      const countsRecords = await runCypher(countsQuery)
+      const counts: { [key: string]: number } = {}
+      
+      countsRecords.forEach(record => {
+        const label = (record as any).get('label')
+        const count = (record as any).get('count').toNumber()
+        counts[label.toLowerCase()] = count
+      })
+      
+      // Get sample entities of each type
+      const sampleArticles = await this.getRecentArticles(5)
+      
+      const topicsQuery = `
+        MATCH (t:Topic)
+        RETURN t
+        ORDER BY rand()
+        LIMIT 5
+      `
+      const topicRecords = await runCypher(topicsQuery)
+      const sampleTopics = topicRecords.map(record => (record as any).get('t').properties as Topic)
+      
+      const peopleQuery = `
+        MATCH (p:Person)
+        RETURN p
+        ORDER BY rand()
+        LIMIT 5
+      `
+      const peopleRecords = await runCypher(peopleQuery)
+      const samplePeople = peopleRecords.map(record => (record as any).get('p').properties as Person)
+      
+      const orgsQuery = `
+        MATCH (o:Organization)
+        RETURN o
+        ORDER BY rand()
+        LIMIT 5
+      `
+      const orgRecords = await runCypher(orgsQuery)
+      const sampleOrganizations = orgRecords.map(record => (record as any).get('o').properties as Organization)
+      
+      const locationsQuery = `
+        MATCH (g:Geo)
+        WHERE g.location IS NOT NULL
+        RETURN g
+        ORDER BY rand()
+        LIMIT 5
+      `
+      const locationRecords = await runCypher(locationsQuery)
+      const sampleLocations = locationRecords.map(record => (record as any).get('g').properties as Geo)
+      
+      const authorsQuery = `
+        MATCH (a:Author)
+        RETURN a
+        ORDER BY rand()
+        LIMIT 5
+      `
+      const authorRecords = await runCypher(authorsQuery)
+      const sampleAuthors = authorRecords.map(record => (record as any).get('a').properties as Author)
+      
+      return {
+        article: counts.article || 0,
+        topic: counts.topic || 0,
+        person: counts.person || 0,
+        organization: counts.organization || 0,
+        geo: counts.geo || 0,
+        author: counts.author || 0,
+        sampleArticles,
+        sampleTopics,
+        samplePeople,
+        sampleOrganizations,
+        sampleLocations,
+        sampleAuthors
+      }
+    } catch (error) {
+      console.error('Failed to get overview graph data:', error)
+      return null
+    }
+  }
 }
