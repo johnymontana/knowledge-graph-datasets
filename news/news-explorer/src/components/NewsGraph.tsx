@@ -52,10 +52,15 @@ const NODE_SIZES = {
   author: 8
 }
 
-// Canvas-based graph renderer
+// Canvas-based graph renderer with zoom and pan
 function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const [panX, setPanX] = useState(0)
+  const [panY, setPanY] = useState(0)
+  const [isDragging, setIsDragging] = useState(false)
+  const [dragStart, setDragStart] = useState({ x: 0, y: 0 })
 
   useEffect(() => {
     if (!canvasRef.current || !graphData.nodes.length) return
@@ -139,10 +144,15 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
 
       // Draw
       ctx.clearRect(0, 0, canvas.width, canvas.height)
+      
+      // Apply zoom and pan transformations
+      ctx.save()
+      ctx.translate(panX, panY)
+      ctx.scale(zoom, zoom)
 
       // Draw edges
       ctx.strokeStyle = '#e2e8f0'
-      ctx.lineWidth = 1
+      ctx.lineWidth = 1 / zoom // Adjust line width for zoom
       graphData.edges.forEach(edge => {
         const source = nodes.find(n => n.id === edge.source)
         const target = nodes.find(n => n.id === edge.target)
@@ -165,16 +175,18 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
         ctx.fill()
         
         ctx.strokeStyle = selectedNode?.id === node.id ? '#000' : '#fff'
-        ctx.lineWidth = selectedNode?.id === node.id ? 3 : 2
+        ctx.lineWidth = selectedNode?.id === node.id ? 3 / zoom : 2 / zoom
         ctx.stroke()
 
         // Draw labels
         ctx.fillStyle = '#2d3748'
-        ctx.font = '12px Arial'
+        ctx.font = `${12 / zoom}px Arial`
         ctx.textAlign = 'center'
         const label = node.label.length > 20 ? node.label.substring(0, 20) + '...' : node.label
-        ctx.fillText(label, node.x, node.y + size + 15)
+        ctx.fillText(label, node.x, node.y + size + 15 / zoom)
       })
+
+      ctx.restore()
 
       animationId = requestAnimationFrame(simulate)
     }
@@ -182,8 +194,8 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
     // Handle click events
     const handleClick = (event: MouseEvent) => {
       const rect = canvas.getBoundingClientRect()
-      const x = event.clientX - rect.left
-      const y = event.clientY - rect.top
+      const x = (event.clientX - rect.left - panX) / zoom
+      const y = (event.clientY - rect.top - panY) / zoom
 
       const clickedNode = nodes.find(node => {
         const distance = Math.sqrt((x - node.x) ** 2 + (y - node.y) ** 2)
@@ -200,7 +212,51 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
       }
     }
 
+    // Handle wheel zoom
+    const handleWheel = (event: WheelEvent) => {
+      event.preventDefault()
+      const rect = canvas.getBoundingClientRect()
+      const mouseX = event.clientX - rect.left
+      const mouseY = event.clientY - rect.top
+      
+      const zoomFactor = event.deltaY > 0 ? 0.9 : 1.1
+      const newZoom = Math.max(0.1, Math.min(5, zoom * zoomFactor))
+      
+      // Zoom towards mouse position
+      const zoomRatio = newZoom / zoom
+      setPanX(mouseX - (mouseX - panX) * zoomRatio)
+      setPanY(mouseY - (mouseY - panY) * zoomRatio)
+      setZoom(newZoom)
+    }
+
+    // Handle mouse down for panning
+    const handleMouseDown = (event: MouseEvent) => {
+      if (event.button === 0) { // Left click only
+        setIsDragging(true)
+        setDragStart({ x: event.clientX - panX, y: event.clientY - panY })
+      }
+    }
+
+    // Handle mouse move for panning
+    const handleMouseMove = (event: MouseEvent) => {
+      if (isDragging) {
+        setPanX(event.clientX - dragStart.x)
+        setPanY(event.clientY - dragStart.y)
+      }
+    }
+
+    // Handle mouse up for panning
+    const handleMouseUp = () => {
+      setIsDragging(false)
+    }
+
+    // Add event listeners
     canvas.addEventListener('click', handleClick)
+    canvas.addEventListener('wheel', handleWheel, { passive: false })
+    canvas.addEventListener('mousedown', handleMouseDown)
+    canvas.addEventListener('mousemove', handleMouseMove)
+    canvas.addEventListener('mouseup', handleMouseUp)
+    canvas.addEventListener('mouseleave', handleMouseUp)
 
     // Start simulation
     simulate()
@@ -209,8 +265,13 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
     return () => {
       cancelAnimationFrame(animationId)
       canvas.removeEventListener('click', handleClick)
+      canvas.removeEventListener('wheel', handleWheel)
+      canvas.removeEventListener('mousedown', handleMouseDown)
+      canvas.removeEventListener('mousemove', handleMouseMove)
+      canvas.removeEventListener('mouseup', handleMouseUp)
+      canvas.removeEventListener('mouseleave', handleMouseUp)
     }
-  }, [graphData, onNodeSelect])
+  }, [graphData, onNodeSelect, zoom, panX, panY, isDragging, dragStart])
 
   return (
     <canvas
@@ -218,7 +279,7 @@ function CanvasGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData
       style={{
         width: '100%',
         height: '100%',
-        cursor: 'pointer'
+        cursor: isDragging ? 'grabbing' : 'grab'
       }}
     />
   )
