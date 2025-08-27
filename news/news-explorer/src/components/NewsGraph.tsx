@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { Box, VStack, HStack, Text, Badge, Button, Select, SimpleGrid, Card, CardBody, CardHeader, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
 import dynamic from 'next/dynamic'
 import { Article } from '@/lib/neo4j'
+import '@react-sigma/core/lib/style.css'
 
 // Define types for graph data
 export interface GraphNode {
