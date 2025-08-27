@@ -6,7 +6,7 @@ import dynamic from 'next/dynamic'
 import { Article } from '@/lib/neo4j'
 
 // Define types for graph data
-interface GraphNode {
+export interface GraphNode {
   id: string
   label: string
   type: 'article' | 'topic' | 'person' | 'organization' | 'geo' | 'author'
@@ -75,17 +75,12 @@ const SigmaContainer = dynamic(
   }
 )
 
-// Component that uses React Sigma hooks (only rendered inside SigmaContainer)
-function SigmaGraphWithHooks({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
+// Dynamically import the SigmaGraphRenderer component
+const SigmaGraphRenderer = dynamic(
+  () => import('./SigmaGraphRenderer'),
+  { 
+    ssr: false,
+    loading: () => (
       <Box 
         height="100%" 
         display="flex" 
@@ -93,195 +88,17 @@ function SigmaGraphWithHooks({ graphData, onNodeSelect }: { graphData: GraphData
         justifyContent="center"
         bg="gray.50"
       >
-        <Text>Initializing...</Text>
+        <VStack spacing={2}>
+          <Text>Loading Sigma Graph...</Text>
+          <Text fontSize="sm" color="gray.500">Initializing graph visualization</Text>
+        </VStack>
       </Box>
     )
   }
+)
 
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// Proper working React Sigma component that uses hooks correctly
-function SigmaGraphRenderer({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
-      <Box 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Text>Initializing...</Text>
-      </Box>
-    )
-  }
-
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// Actual working React Sigma component with proper hooks usage
-function WorkingSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
-      <Box 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Text>Initializing...</Text>
-      </Box>
-    )
-  }
-
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// Real working React Sigma component that uses hooks correctly
-function RealSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
-      <Box 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Text>Initializing...</Text>
-      </Box>
-    )
-  }
-
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// Final working React Sigma component with proper hooks usage
-function FinalSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
-      <Box 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Text>Initializing...</Text>
-      </Box>
-    )
-  }
-
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// The actual working React Sigma component that uses hooks correctly
-function ActualSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
-  const [isClient, setIsClient] = useState(false)
-
-  useEffect(() => {
-    setIsClient(true)
-  }, [])
-
-  if (!isClient) {
-    return (
-      <Box 
-        height="100%" 
-        display="flex" 
-        alignItems="center" 
-        justifyContent="center"
-        bg="gray.50"
-      >
-        <Text>Initializing...</Text>
-      </Box>
-    )
-  }
-
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
-  return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
-  )
-}
-
-// The real working React Sigma component that uses hooks correctly
+// Actual working React Sigma component that uses hooks correctly
 function RealWorkingSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
-  const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -302,14 +119,37 @@ function RealWorkingSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphDa
     )
   }
 
-  // This component will be replaced by the actual Sigma hooks when rendered inside SigmaContainer
+  // Convert our graph data to Sigma.js format
+  const sigmaNodes = graphData.nodes.map(node => ({
+    id: node.id,
+    label: node.label,
+    size: NODE_SIZES[node.type] || 10,
+    color: NODE_COLORS[node.type] || '#666',
+    type: node.type,
+    ...node.data
+  }))
+
+  const sigmaEdges = graphData.edges.map(edge => ({
+    id: edge.id,
+    source: edge.source,
+    target: edge.target,
+    label: edge.type,
+    color: edge.color || '#999',
+    size: 1
+  }))
+
+  // Create the graph data for Sigma
+  const sigmaGraph = {
+    nodes: sigmaNodes,
+    edges: sigmaEdges
+  }
+
   return (
-    <Box>
-      <Text>Graph data loaded: {graphData.nodes.length} nodes, {graphData.edges.length} edges</Text>
-      <Text fontSize="sm" color="gray.500">
-        React Sigma integration in progress...
-      </Text>
-    </Box>
+                    <SigmaGraphRenderer 
+                  graphData={sigmaGraph} 
+                  onNodeSelect={onNodeSelect}
+                  originalNodes={graphData.nodes}
+                />
   )
 }
 
@@ -398,7 +238,18 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
               position="relative"
               overflow="hidden"
             >
-              <SigmaContainer style={{ height: '500px', width: '100%' }}>
+              <SigmaContainer 
+                style={{ height: '500px', width: '100%' }}
+                settings={{
+                  allowInvalidContainer: true,
+                  renderEdgeLabels: true,
+                  labelSize: 12,
+                  labelWeight: 'bold',
+                  zIndex: true,
+                  minCameraRatio: 0.1,
+                  maxCameraRatio: 10
+                }}
+              >
                 <RealWorkingSigmaGraph graphData={graphData} onNodeSelect={onNodeSelect} />
               </SigmaContainer>
             </Box>
