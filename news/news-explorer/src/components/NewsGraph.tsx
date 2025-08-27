@@ -4,7 +4,6 @@ import { useState, useEffect } from 'react'
 import { Box, VStack, HStack, Text, Badge, Button, Select, SimpleGrid, Card, CardBody, CardHeader, Tabs, TabList, TabPanels, Tab, TabPanel } from '@chakra-ui/react'
 import dynamic from 'next/dynamic'
 import { Article } from '@/lib/neo4j'
-import '@react-sigma/core/lib/style.css'
 
 // Define types for graph data
 export interface GraphNode {
@@ -99,7 +98,7 @@ const SigmaGraphRenderer = dynamic(
 )
 
 // Actual working React Sigma component that uses hooks correctly
-function RealWorkingSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (node: GraphNode) => void }) {
+function RealWorkingSigmaGraph({ graphData, onNodeSelect }: { graphData: GraphData; onNodeSelect?: (nodeId: string, nodeData: Record<string, unknown>) => void }) {
   const [isClient, setIsClient] = useState(false)
 
   useEffect(() => {
@@ -158,6 +157,31 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
   const [layoutAlgorithm, setLayoutAlgorithm] = useState<string>('forceLayout')
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [activeTab, setActiveTab] = useState(0)
+
+  // Handle node selection from the graph
+  const handleNodeSelect = (nodeId: string, nodeData: Record<string, unknown>) => {
+    console.log('=== NODE SELECTION DEBUG ===')
+    console.log('Node ID received:', nodeId)
+    console.log('Node data received:', nodeData)
+    console.log('Available graphData.nodes:', graphData.nodes)
+    console.log('Looking for node with ID:', nodeId)
+    
+    // Find the original node data
+    const originalNode = graphData.nodes.find(n => n.id === nodeId)
+    console.log('Original node found:', originalNode)
+    
+    if (originalNode) {
+      console.log('Setting selected node:', originalNode)
+      setSelectedNode(originalNode)
+      if (onNodeSelect) {
+        onNodeSelect(originalNode)
+      }
+    } else {
+      console.warn('No original node found for ID:', nodeId)
+      console.warn('Available node IDs:', graphData.nodes.map(n => n.id))
+    }
+    console.log('=== END NODE SELECTION DEBUG ===')
+  }
 
   if (!graphData.nodes.length) {
     return (
@@ -251,7 +275,7 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
                   maxCameraRatio: 10
                 }}
               >
-                <RealWorkingSigmaGraph graphData={graphData} onNodeSelect={onNodeSelect} />
+                <RealWorkingSigmaGraph graphData={graphData} onNodeSelect={handleNodeSelect} />
               </SigmaContainer>
             </Box>
           </TabPanel>
@@ -351,21 +375,123 @@ export default function NewsGraph({ graphData, onNodeSelect, height = '600px' }:
       {selectedNode && (
         <Card>
           <CardHeader>
-            <HStack>
-              <Badge colorScheme={selectedNode.type === 'article' ? 'blue' : selectedNode.type === 'topic' ? 'green' : selectedNode.type === 'person' ? 'yellow' : selectedNode.type === 'organization' ? 'purple' : selectedNode.type === 'geo' ? 'red' : 'cyan'}>
-                {selectedNode.type}
-              </Badge>
-              <Text fontSize="lg" fontWeight="bold">{selectedNode.label}</Text>
+            <HStack justify="space-between" align="center">
+              <HStack>
+                <Badge colorScheme={selectedNode.type === 'article' ? 'blue' : selectedNode.type === 'topic' ? 'green' : selectedNode.type === 'person' ? 'yellow' : selectedNode.type === 'organization' ? 'purple' : selectedNode.type === 'geo' ? 'red' : 'cyan'}>
+                  {selectedNode.type}
+                </Badge>
+                <Text fontSize="lg" fontWeight="bold">{selectedNode.label}</Text>
+              </HStack>
+              <Button
+                size="sm"
+                variant="ghost"
+                onClick={() => setSelectedNode(null)}
+              >
+                ✕
+              </Button>
             </HStack>
           </CardHeader>
           <CardBody>
-            <VStack align="start" spacing={2}>
-              <Text fontSize="sm"><strong>ID:</strong> {selectedNode.id}</Text>
-              {selectedNode.data && Object.entries(selectedNode.data).map(([key, value]) => (
-                <Text key={key} fontSize="sm">
-                  <strong>{key}:</strong> {String(value)}
-                </Text>
-              ))}
+            {/* Debug Info */}
+            <Box mb={4} p={3} bg="yellow.50" borderRadius="md" border="1px solid" borderColor="yellow.200">
+              <Text fontSize="sm" fontWeight="bold" color="yellow.800">Debug Info:</Text>
+              <Text fontSize="xs" fontFamily="mono" color="yellow.700">
+                selectedNode: {JSON.stringify(selectedNode, null, 2)}
+              </Text>
+            </Box>
+            
+            <VStack align="start" spacing={4}>
+              {/* Basic Node Information */}
+              <Box>
+                <Text fontSize="md" fontWeight="bold" mb={2}>Node Information</Text>
+                <SimpleGrid columns={2} spacing={3}>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600">ID</Text>
+                    <Text fontSize="sm" fontFamily="mono">{selectedNode.id}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600">Type</Text>
+                    <Text fontSize="sm">{selectedNode.type}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600">Size</Text>
+                    <Text fontSize="sm">{selectedNode.size}</Text>
+                  </Box>
+                  <Box>
+                    <Text fontSize="sm" color="gray.600">Color</Text>
+                    <Box 
+                      width="20px" 
+                      height="20px" 
+                      bg={selectedNode.color} 
+                      borderRadius="sm"
+                      border="1px solid"
+                      borderColor="gray.300"
+                    />
+                  </Box>
+                </SimpleGrid>
+              </Box>
+
+              {/* Node Data Properties */}
+              {selectedNode.data && Object.keys(selectedNode.data).length > 0 && (
+                <Box>
+                  <Text fontSize="md" fontWeight="bold" mb={2}>Properties</Text>
+                  <SimpleGrid columns={{ base: 1, md: 2 }} spacing={3}>
+                    {Object.entries(selectedNode.data).map(([key, value]) => (
+                      <Box key={key} p={3} bg="gray.50" borderRadius="md">
+                        <Text fontSize="sm" fontWeight="bold" color="gray.700" mb={1}>
+                          {key}
+                        </Text>
+                        <Text fontSize="sm" color="gray.600" wordBreak="break-word">
+                          {String(value)}
+                        </Text>
+                      </Box>
+                    ))}
+                  </SimpleGrid>
+                </Box>
+              )}
+
+              {/* Connected Edges */}
+              <Box>
+                <Text fontSize="md" fontWeight="bold" mb={2}>Connections</Text>
+                <VStack align="start" spacing={2}>
+                  {graphData.edges
+                    .filter(edge => edge.source === selectedNode.id || edge.target === selectedNode.id)
+                    .map(edge => {
+                      const isSource = edge.source === selectedNode.id
+                      const connectedNodeId = isSource ? edge.target : edge.source
+                      const connectedNode = graphData.nodes.find(n => n.id === connectedNodeId)
+                      
+                      return (
+                        <Box 
+                          key={edge.id} 
+                          p={3} 
+                          bg="blue.50" 
+                          borderRadius="md" 
+                          border="1px solid"
+                          borderColor="blue.200"
+                          width="100%"
+                        >
+                          <HStack justify="space-between" align="center">
+                            <VStack align="start" spacing={1}>
+                              <Text fontSize="sm" fontWeight="bold">
+                                {isSource ? '→' : '←'} {edge.type}
+                              </Text>
+                              <Text fontSize="sm" color="gray.600">
+                                {connectedNode?.label || connectedNodeId}
+                              </Text>
+                            </VStack>
+                            <Badge colorScheme={connectedNode?.type === 'article' ? 'blue' : connectedNode?.type === 'topic' ? 'green' : connectedNode?.type === 'person' ? 'yellow' : connectedNode?.type === 'organization' ? 'purple' : connectedNode?.type === 'geo' ? 'red' : 'cyan'}>
+                              {connectedNode?.type || 'unknown'}
+                            </Badge>
+                          </HStack>
+                        </Box>
+                      )
+                    })}
+                  {graphData.edges.filter(edge => edge.source === selectedNode.id || edge.target === selectedNode.id).length === 0 && (
+                    <Text fontSize="sm" color="gray.500">No connections found</Text>
+                  )}
+                </VStack>
+              </Box>
             </VStack>
           </CardBody>
         </Card>
