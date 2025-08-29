@@ -105,6 +105,34 @@ Import comprehensive knowledge graphs from Wikidata using SPARQL queries, creati
 
 **Use Cases:** Knowledge graph research, semantic search, entity linking, spatial analysis, academic research, business intelligence
 
+---
+
+### 🌐 Diffbot Knowledge Graph
+**Location**: `diffbot/`  
+**Target Database**: Neo4j  
+**Data Type**: Web-Scale Entity Data from Diffbot API
+
+Import comprehensive knowledge graph data from Diffbot's 10+ billion entity database into Neo4j, creating rich, interconnected datasets with organizations, people, articles, and their relationships extracted from the public web.
+
+**Key Features:**
+- **Massive Scale**: Access to 10+ billion entities from the public web
+- **Entity Types**: Organizations, People, Articles, and custom entity types  
+- **Rich Metadata**: Comprehensive properties including locations, industries, relationships
+- **Async Processing**: High-performance concurrent API requests
+- **Spatial Support**: Geographic coordinates for location-based queries
+- **Flexible Queries**: Support for Diffbot's DQL (Diffbot Query Language)
+- **Resume Functionality**: Paginated imports with progress tracking
+- **Rate Limiting**: Built-in request throttling and retry logic
+
+**Current Dataset Size:**
+- **37 total entities** with **68 relationships**
+- **18 people** (including Elon Musk and family members)
+- **12 organizations** (universities, schools, political parties)
+- **3 administrative areas** (countries)
+- **2 education majors** and **2 degree types**
+
+**Use Cases:** Business intelligence, competitive analysis, market research, lead generation, due diligence, content recommendation, entity resolution
+
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
@@ -167,6 +195,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 | **News** | Neo4j | Variable | Article↔Entity, Topic relations | ✅ Locations | ✅ Embeddings |
 | **Foursquare** | Neo4j | 13K+ places | Stop↔Place, Category relations | ✅ Full GIS | ❌ |
 | **Wikidata** | Neo4j | 3.9K entities | Entity↔Entity, Spatial relations | ✅ Full GIS | ❌ |
+| **Diffbot** | Neo4j | 37 entities | Person→Organization, Education relations | ✅ Locations | ❌ |
 
 ## 🏗️ Common Architecture Patterns
 
@@ -258,6 +287,16 @@ RETURN s.name, s.birth_date, s.country
 MATCH (u:University)
 WHERE distance(u.coordinates, point({latitude: 40.7128, longitude: -74.0060})) < 50000
 RETURN u.name, distance(u.coordinates, point({latitude: 40.7128, longitude: -74.0060})) as distance_meters
+
+// Diffbot knowledge graph queries
+MATCH (p:Person)-[:EDUCATED_AT]->(o:Organization)
+WHERE p.name = "Elon Musk"
+RETURN p.name, o.name, o.type
+
+// Family relationships in Diffbot
+MATCH (p:Person)-[:HAS_CHILDREN]->(c:Person)
+WHERE p.name = "Elon Musk"
+RETURN p.name, collect(c.name) as children
 ```
 
 ## 📁 Project Structure
@@ -288,6 +327,12 @@ knowledge-graph-datasets/
 │   ├── wikidata_sparql.py
 │   ├── sample_queries_neo4j.py
 │   └── test_wikidata_data.py
+├── diffbot/               # 🌐 Diffbot knowledge graph (Neo4j)
+│   ├── data/
+│   ├── diffbot_import_neo4j.py
+│   ├── diffbot_client.py
+│   ├── sample_queries_neo4j.py
+│   └── docker-compose.yml
 └── README.md              # This file
 ```
 
