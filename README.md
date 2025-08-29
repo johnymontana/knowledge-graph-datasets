@@ -78,6 +78,33 @@ Combine Foursquare places data with transit information to analyze accessibility
 
 **Use Cases:** Urban accessibility, business location analysis, transit planning, walkability studies
 
+---
+
+### 📊 Wikidata Knowledge Graph
+**Location**: `wikidata/`  
+**Target Database**: Neo4j  
+**Data Type**: Structured Knowledge from Wikidata
+
+Import comprehensive knowledge graphs from Wikidata using SPARQL queries, creating rich, interconnected datasets with scientists, cities, universities, companies, and custom entities.
+
+**Key Features:**
+- Direct SPARQL integration with Wikidata endpoint
+- Multiple entity types (scientists, cities, universities, companies)
+- Spatial data support with Neo4j Point type
+- Automatic relationship creation and schema management
+- Batch processing with pagination for large datasets
+- Comprehensive data validation and testing suite
+- Synthetic ID system for derived entities
+
+**Current Dataset Size:**
+- **3,878 total entities** with **3,654 relationships**
+- **1,540 organizations** (universities + companies)
+- **1,208 places** (cities, states, countries)
+- **551 people** (scientists, mayors)
+- **1,537 entities with spatial coordinates**
+
+**Use Cases:** Knowledge graph research, semantic search, entity linking, spatial analysis, academic research, business intelligence
+
 ## 🚀 Quick Start Guide
 
 ### Prerequisites
@@ -139,6 +166,7 @@ powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
 | **OpenStreetMap** | Neo4j | Variable | Road↔Intersection, Feature↔Geometry | ✅ Full GIS | ❌ |
 | **News** | Neo4j | Variable | Article↔Entity, Topic relations | ✅ Locations | ✅ Embeddings |
 | **Foursquare** | Neo4j | 13K+ places | Stop↔Place, Category relations | ✅ Full GIS | ❌ |
+| **Wikidata** | Neo4j | 3.9K entities | Entity↔Entity, Spatial relations | ✅ Full GIS | ❌ |
 
 ## 🏗️ Common Architecture Patterns
 
@@ -196,6 +224,14 @@ All geospatial datasets support:
 - **Memory optimization** for large datasets
 - **Index strategies** for query performance
 
+### Wikidata Import Process
+- **SPARQL Integration**: Direct connection to Wikidata's SPARQL endpoint
+- **Entity Type Support**: Scientists, cities, universities, companies, and custom queries
+- **Relationship Mapping**: Automatic creation of entity relationships
+- **Spatial Data**: Full coordinate support with Neo4j Point type
+- **Synthetic IDs**: Unique identifier system for derived entities
+- **Data Validation**: Comprehensive testing suite for quality assurance
+
 ### Query Capabilities
 ```cypher
 // Spatial proximity query
@@ -212,6 +248,16 @@ RETURN path LIMIT 10
 CALL db.index.vector.queryNodes('article_embeddings', 10, $queryVector)
 YIELD node, score
 RETURN node.title, score ORDER BY score DESC
+
+// Wikidata knowledge graph queries
+MATCH (s:Scientist)-[:WORKS_IN]->(f:Field)
+WHERE f.name = "Physics"
+RETURN s.name, s.birth_date, s.country
+
+// Spatial analysis with Wikidata
+MATCH (u:University)
+WHERE distance(u.coordinates, point({latitude: 40.7128, longitude: -74.0060})) < 50000
+RETURN u.name, distance(u.coordinates, point({latitude: 40.7128, longitude: -74.0060})) as distance_meters
 ```
 
 ## 📁 Project Structure
@@ -236,6 +282,12 @@ knowledge-graph-datasets/
 │   ├── data/
 │   ├── foursquare_import_neo4j.py
 │   └── routing_queries.py
+├── wikidata/              # 📊 Wikidata knowledge graph (Neo4j)
+│   ├── data/
+│   ├── wikidata_import_neo4j.py
+│   ├── wikidata_sparql.py
+│   ├── sample_queries_neo4j.py
+│   └── test_wikidata_data.py
 └── README.md              # This file
 ```
 
@@ -272,6 +324,9 @@ Each project is self-contained with its own:
 - **Transportation Research**: Model complex transit systems
 - **Urban Studies**: Analyze city development and accessibility
 - **Computer Science**: Graph algorithms and spatial computing
+- **Knowledge Graph Research**: Build and analyze structured knowledge graphs
+- **Entity Linking**: Connect entities across different datasets and domains
+- **Semantic Search**: Enable complex querying of structured knowledge
 
 ## 🤝 Contributing
 

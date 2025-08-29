@@ -1,0 +1,40 @@
+[project]
+name = "wikidata-neo4j"
+version = "0.1.0"
+description = "Import Wikidata knowledge graph into Neo4j"
+authors = [
+    {name = "Knowledge Graph Datasets", email = "noreply@example.com"},
+]
+readme = "README.md"
+requires-python = ">=3.8"
+dependencies = [
+    "neo4j>=5.0.0",
+    "requests>=2.28.0",
+    "pandas>=1.5.0",
+    "python-dotenv>=0.19.0",
+    "tqdm>=4.64.0",
+    "sparqlwrapper>=2.0.0",
+    "rdflib>=6.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "black>=22.0.0",
+    "flake8>=5.0.0",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+py-modules = ["wikidata_import_neo4j", "wikidata_sparql", "neo4j_config", "neo4j_schema", "sample_queries_neo4j"]
+
+[tool.black]
+line-length = 88
+target-version = ['py38']
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
