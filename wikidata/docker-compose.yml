@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  neo4j:
+    image: neo4j:5.15
+    container_name: neo4j-wikidata
+    hostname: neo4j-wikidata
+    ports:
+      - "7474:7474"  # HTTP
+      - "7687:7687"  # Bolt
+    environment:
+      NEO4J_AUTH: neo4j/password
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+      # Memory settings for Wikidata imports
+      NEO4J_dbms_memory_heap_initial__size: 2G
+      NEO4J_dbms_memory_heap_max__size: 4G
+      NEO4J_dbms_memory_pagecache_size: 2G
+      # Transaction settings
+      NEO4J_dbms_transaction_timeout: 60s
+      NEO4J_dbms_lock_acquisition_timeout: 60s
+      # Logging
+      NEO4J_dbms_logs_query_enabled: "true"
+      NEO4J_dbms_logs_query_threshold: 5s
+    volumes:
+      - neo4j-wikidata-data:/data
+      - neo4j-wikidata-logs:/logs
+      - neo4j-wikidata-import:/var/lib/neo4j/import
+      - ./data:/import  # Mount local data directory
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p password 'RETURN 1' || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+volumes:
+  neo4j-wikidata-data:
+  neo4j-wikidata-logs:
+  neo4j-wikidata-import:
