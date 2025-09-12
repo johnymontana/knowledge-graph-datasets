@@ -15,6 +15,7 @@ A comprehensive knowledge graph system for news articles using Neo4j, AI embeddi
 - **Temporal Analysis**: Time-based article analysis and filtering
 - **High-Performance Import**: Optimized bulk operations for fast data loading (10,000x faster than original)
 - **Flexible Import Options**: Choose between full-featured or performance-optimized import modes
+- **AI-Powered Geocoding**: Automatically geocode geographic locations using Ollama for enhanced spatial analysis
 
 ## 🏗️ Architecture
 
@@ -234,6 +235,82 @@ WITH a, g, distance(g.location, point({latitude: 40.7128, longitude: -74.0060}))
 WHERE dist < 100000  // 100km in meters
 RETURN a.title, g.name, round(dist/1000) as distance_km
 ORDER BY dist
+```
+
+### 5. AI-Powered Geocoding
+
+The system can automatically geocode geographic locations that don't have coordinates using AI models through Ollama. This enhances spatial analysis capabilities.
+
+#### Prerequisites
+
+```bash
+# Install and start Ollama
+curl -fsSL https://ollama.ai/install.sh | sh
+ollama serve
+
+# Pull a model (recommended: llama3.2)
+ollama pull llama3.2
+```
+
+#### Geocoding Commands
+
+```bash
+# Check geocoding prerequisites (Neo4j + Ollama)
+make geocode-setup
+
+# Check status of Geo nodes
+make check-geo-status
+
+# Geocode all Geo nodes without location (default settings)
+make run-geocode
+
+# Geocode with custom batch size and delay
+make run-geocode-batch batch=5 delay=2.0
+
+# Complete geocoding workflow (check → geocode → check)
+make geocode-workflow
+```
+
+#### How It Works
+
+1. **Discovery**: Finds all Geo nodes without `location` property
+2. **AI Geocoding**: Uses Ollama to convert location names to coordinates
+3. **Database Update**: Updates Neo4j with latitude/longitude data
+4. **Progress Tracking**: Shows real-time progress and completion status
+
+#### Configuration Options
+
+- **Batch Size**: Control how many locations to process at once
+- **Delay**: Set delay between API calls to avoid overwhelming Ollama
+- **Error Handling**: Continues processing even if individual locations fail
+- **Progress Reporting**: Real-time status updates and completion statistics
+
+#### Example Output
+
+```
+🌍 Neo4j Geo Node Geocoder
+========================================
+✅ Ollama is running
+✅ Connected to Neo4j at bolt://localhost:7687
+📋 Configuration:
+  Batch size: 10
+  Delay between requests: 1.0s
+
+🌍 Found 25 Geo nodes without location properties
+Starting geocoding process...
+
+[1/25] Geocoding: New York City
+  ✅ Updated New York City: 40.7128, -74.0060
+
+[2/25] Geocoding: London, England
+  ✅ Updated London, England: 51.5074, -0.1278
+
+...
+
+🎉 Geocoding complete!
+  ✅ Successful: 23
+  ❌ Failed: 2
+  📊 Total processed: 25
 ```
 
 ## 🧪 Testing and Validation

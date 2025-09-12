@@ -267,7 +267,7 @@ class NewsImporterNeo4j:
                     geo_query = """
                     MATCH (a:Article {uri: $uri})
                     MERGE (g:Geo {name: $name})
-                    SET g.location = point({latitude: $lat, longitude: $lon})
+                    SET g.location = point({latitude: $lat, longitude: $lon, srid: 4326})
                     MERGE (a)-[:LOCATED_IN]->(g)
                     """
                     session.run(geo_query, 
